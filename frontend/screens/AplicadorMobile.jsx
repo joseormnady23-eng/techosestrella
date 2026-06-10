@@ -1,8 +1,8 @@
-/* global React, Icon, OBRAS, CUADRILLAS, ROLES, useKlikaStore, money0, useRHStore, SolicitarAusencia */
+/* global React, Icon, OBRAS, CUADRILLAS, ROLES, useKlikaStore, money0, useRHStore, SolicitarAusencia, KlikaAPI, KlikaData */
 // ============================================================
 //  Marco de teléfono reutilizable
 // ============================================================
-const { useState: useStateAp } = React;
+const { useState: useStateAp, useEffect: useEffectAp } = React;
 
 function PhoneFrame({ children, label }) {
   return (
@@ -30,12 +30,32 @@ function PhoneFrame({ children, label }) {
 function AplicadorMobile({ onKlika, setRole, role }) {
   const store = useKlikaStore();
   const rh = useRHStore();
-  const yo = rh.empleado("U-4"); // Wilkin Suero
+  const yoUser = window.KlikaAPI?.usuario();
+  const yo = rh.empleado(yoUser?.id) ?? rh.empleado("U-4") ?? rh.empleados[0];
+  const yoNombre = yoUser?.nombre ?? yo?.nombre ?? "Aplicador";
   const [checkedIn, setCheckedIn] = useStateAp(false);
+  const [asistenciaId, setAsistenciaId] = useStateAp(null);
   const [scanOpen, setScanOpen] = useStateAp(false);
   const [ausOpen, setAusOpen] = useStateAp(false);
-  const misObras = OBRAS.filter((o) => o.cuadrilla === "CU-1" && ["proceso", "aprobada"].includes(o.estado));
-  const misAus = rh.ausenciasDe("U-4").sort((a, b) => b.ini.localeCompare(a.ini));
+  const [misObrasData, setMisObrasData] = useStateAp(null);
+
+  useEffectAp(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.obras.lista({ per_page: 20 }).then((res) => {
+      const arr = (res.data ?? res)
+        .filter((o) => ["proceso", "aprobada", "en_proceso"].includes(o.estado))
+        .map((o) => ({
+          id: o.codigo ?? String(o.id), _id: o.id,
+          clienteNom: o.cliente?.nombre ?? "", titulo: o.titulo ?? "",
+          cuadrilla: o.cuadrilla_id ?? null, estado: o.estado === "en_proceso" ? "proceso" : (o.estado ?? "proceso"),
+          direccion: o.direccion ?? "", total: Number(o.total ?? 0),
+        }));
+      if (arr.length) setMisObrasData(arr);
+    }).catch(() => {});
+  }, []);
+
+  const misObras = misObrasData ?? OBRAS.filter((o) => o.cuadrilla === "CU-1" && ["proceso", "aprobada"].includes(o.estado));
+  const misAus = (yo ? rh.ausenciasDe(yo.id) : rh.ausenciasDe("U-4")).sort((a, b) => b.ini.localeCompare(a.ini));
   const dispVac = rh.vacacionesDisponibles(yo);
 
   return (
@@ -45,7 +65,7 @@ function AplicadorMobile({ onKlika, setRole, role }) {
         <div style={ap.header}>
           <div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,.75)" }}>Hola,</div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: "#fff" }}>Wilkin Suero</div>
+            <div style={{ fontSize: 19, fontWeight: 800, color: "#fff" }}>{yoNombre.split(" ")[0]}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onKlika} style={ap.headBtn}><Icon name="sparkle" size={20} color="#fff" /></button>
@@ -55,11 +75,27 @@ function AplicadorMobile({ onKlika, setRole, role }) {
 
         <div style={{ padding: "0 16px 24px", marginTop: -28 }}>
           {/* check-in grande */}
-          <button onClick={() => setCheckedIn((v) => !v)} style={{ ...ap.checkin, background: checkedIn ? "var(--green)" : "var(--blue-600)" }}>
+          <button onClick={async () => {
+            if (!checkedIn) {
+              setCheckedIn(true);
+              if (window.KlikaData && KlikaData.conectado()) {
+                const obraId = misObras[0]?._id ?? misObras[0]?.id;
+                KlikaData.asistencias.checkin({ obra_id: obraId })
+                  .then((res) => { if (res?.id) setAsistenciaId(res.id); })
+                  .catch(() => {});
+              }
+            } else {
+              setCheckedIn(false);
+              if (asistenciaId && window.KlikaData && KlikaData.conectado()) {
+                KlikaData.asistencias.checkout({ asistencia_id: asistenciaId }).catch(() => {});
+                setAsistenciaId(null);
+              }
+            }
+          }} style={{ ...ap.checkin, background: checkedIn ? "var(--green)" : "var(--blue-600)" }}>
             <span style={ap.checkinIcon}><Icon name={checkedIn ? "checkcircle" : "location"} size={34} color="#fff" /></span>
             <div style={{ textAlign: "left", flex: 1 }}>
               <div style={{ fontSize: 19, fontWeight: 800, color: "#fff" }}>{checkedIn ? "Asistencia marcada" : "Marcar asistencia"}</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{checkedIn ? "09:41 a.m. · Villa Olga ✓" : "Check-in con tu ubicación (GPS)"}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{checkedIn ? "Check-in registrado ✓" : "Check-in con tu ubicación (GPS)"}</div>
             </div>
           </button>
 
@@ -142,7 +178,7 @@ function AplicadorMobile({ onKlika, setRole, role }) {
       </div>
       {scanOpen && <ScannerOverlay store={store} onClose={() => setScanOpen(false)} />}
       {ausOpen && (
-        <SolicitarAusencia store={rh} empleadoFijo="U-4" onClose={() => setAusOpen(false)} onSubmit={() => setAusOpen(false)} />
+        <SolicitarAusencia store={rh} empleadoFijo={yo?.id ?? "U-4"} onClose={() => setAusOpen(false)} onSubmit={() => setAusOpen(false)} />
       )}
     </PhoneFrame>
   );

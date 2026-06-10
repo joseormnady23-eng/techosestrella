@@ -130,7 +130,7 @@ function App() {
       </div>
 
       {klikaOpen && <KlikaPanel onClose={() => setKlikaOpen(false)} onNav={nav} />}
-      {portalOpen && <PortalCliente onClose={() => setPortalOpen(false)} />}
+      {portalOpen && <PortalCliente onClose={() => setPortalOpen(false)} obraId={obraId} />}
     </div>
   );
 }

@@ -1,20 +1,58 @@
-/* global React, Icon, TechosLogo, PhoneFrame, money, money0 */
+/* global React, Icon, TechosLogo, PhoneFrame, money, money0, KlikaData */
 // ============================================================
 //  Pantalla 12 · Portal del cliente (vista externa, móvil)
 // ============================================================
-const { useState: useStatePC } = React;
+const { useState: useStatePC, useEffect: useEffectPC } = React;
 
-function PortalCliente({ onClose }) {
+const ETAPAS_DEMO = [
+  { n: 1, titulo: "Etapa 1 · Techo principal", desc: "Impermeabilización 120 m² · 2 manos", total: 132400 },
+  { n: 2, titulo: "Etapa 2 · Marquesina", desc: "Reparación + membrana 28 m²", total: 55020 },
+];
+
+function PortalCliente({ onClose, obraId }) {
   const [tab, setTab] = useStatePC("cotizacion"); // cotizacion | avance
   const [estado, setEstado] = useStatePC(null);    // null | aprobada-1 | cambios | rechazada
+  const [cotizData, setCotizData] = useStatePC(null);
+  const [fotosData, setFotosData] = useStatePC(null);
 
-  const etapas = [
-    { n: 1, titulo: "Etapa 1 · Techo principal", desc: "Impermeabilización 120 m² · 2 manos", total: 132400 },
-    { n: 2, titulo: "Etapa 2 · Marquesina", desc: "Reparación + membrana 28 m²", total: 55020 },
-  ];
-  const fotos = [
-    { fase: "Antes", color: "#9aa3ad" }, { fase: "Durante", color: "#7fa9c9" }, { fase: "Después", color: "#8fc095" },
-  ];
+  useEffectPC(() => {
+    if (!obraId || !window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.cotizaciones.lista({ obra_id: obraId, per_page: 1 }).then((res) => {
+      const arr = res.data ?? res;
+      const c = Array.isArray(arr) ? arr[0] : arr;
+      if (c) setCotizData(c);
+    }).catch(() => {});
+    KlikaData.obras.fotos(obraId).then((res) => {
+      const arr = (res.data ?? res).filter((f) => f.visible_cliente);
+      if (arr.length) setFotosData(arr);
+    }).catch(() => {});
+  }, [obraId]);
+
+  const clienteNom = cotizData?.cliente?.nombre ?? cotizData?.obra?.cliente?.nombre ?? "Cliente";
+  const obraNom = cotizData?.obra?.titulo ?? "Obra";
+  const obraCod = cotizData?.obra?.codigo ?? (obraId ? `OB-${obraId}` : "OB-2401");
+  const validaHasta = cotizData?.valido_hasta
+    ? cotizData.valido_hasta
+    : cotizData?.created_at
+      ? new Date(new Date(cotizData.created_at).getTime() + 30 * 864e5).toLocaleDateString("es-DO", { day: "numeric", month: "short", year: "numeric" })
+      : "15 jun 2026";
+
+  const etapas = cotizData?.items?.length
+    ? cotizData.items.map((it, i) => ({
+        n: i + 1,
+        titulo: it.descripcion ?? it.material?.nombre ?? `Ítem ${i + 1}`,
+        desc: `${it.area_m2 ?? ""} m² · ${it.manos ?? 1} mano(s)`.trim(),
+        total: Number(it.total_con_itbis ?? it.total ?? 0),
+      }))
+    : ETAPAS_DEMO;
+
+  const totalCotiz = cotizData ? Number(cotizData.total_con_itbis ?? cotizData.total ?? 0) : 187420;
+
+  const fotos = fotosData
+    ? fotosData.map((f) => ({ fase: f.fase ?? "Avance", url: f.url ?? null, color: "#7fa9c9" }))
+    : [{ fase: "Antes", color: "#9aa3ad" }, { fase: "Durante", color: "#7fa9c9" }, { fase: "Después", color: "#8fc095" }];
+
+  const progreso = cotizData?.obra?.avance_pct ?? 60;
 
   return (
     <div style={pc.stage} onClick={onClose}>
@@ -29,8 +67,8 @@ function PortalCliente({ onClose }) {
             <div style={pc.header}>
               <TechosLogo scale={0.75} />
               <div style={{ marginTop: 14, fontSize: 13, color: "var(--ink-500)" }}>Propuesta para</div>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>Familia Reyes · Villa Olga</div>
-              <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }} className="mono">OB-2401 · válida hasta 15 jun 2026</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{clienteNom} · {obraNom}</div>
+              <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }} className="mono">{obraCod} · válida hasta {validaHasta}</div>
             </div>
 
             {/* tabs */}
@@ -75,7 +113,7 @@ function PortalCliente({ onClose }) {
 
                 <div style={pc.totalBox}>
                   <span style={{ fontSize: 13.5, color: "var(--ink-500)" }}>Total propuesta completa</span>
-                  <span style={{ fontWeight: 800, fontSize: 20 }}>{money0(187420)}</span>
+                  <span style={{ fontWeight: 800, fontSize: 20 }}>{money0(totalCotiz || etapas.reduce((s, e) => s + e.total, 0))}</span>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 16 }}>
@@ -97,11 +135,11 @@ function PortalCliente({ onClose }) {
               <div style={{ padding: 16 }}>
                 <div style={pc.progressTop}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700 }}>Tu obra va al 60%</span>
+                    <span style={{ fontWeight: 700 }}>Tu obra va al {progreso}%</span>
                     <span style={{ color: "var(--ink-400)" }}>en proceso</span>
                   </div>
                   <div style={{ height: 10, background: "var(--ink-100)", borderRadius: 99, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: "60%", background: "linear-gradient(90deg,var(--blue-500),var(--blue-700))", borderRadius: 99 }} />
+                    <div style={{ height: "100%", width: progreso + "%", background: "linear-gradient(90deg,var(--blue-500),var(--blue-700))", borderRadius: 99 }} />
                   </div>
                 </div>
 
@@ -109,10 +147,17 @@ function PortalCliente({ onClose }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {fotos.map((f, i) => (
                     <div key={i} style={pc.photo}>
-                      <div style={{ height: 110, background: `repeating-linear-gradient(45deg,${f.color},${f.color} 10px,${f.color}dd 10px,${f.color}dd 20px)`, position: "relative", display: "grid", placeItems: "center" }}>
-                        <span style={{ position: "absolute", top: 8, left: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "rgba(0,0,0,.35)", padding: "3px 9px", borderRadius: 99 }}>{f.fase}</span>
-                        <Icon name="camera" size={24} color="rgba(255,255,255,.8)" />
-                      </div>
+                      {f.url ? (
+                        <div style={{ height: 110, position: "relative" }}>
+                          <img src={f.url} alt={f.fase} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <span style={{ position: "absolute", top: 8, left: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "rgba(0,0,0,.45)", padding: "3px 9px", borderRadius: 99 }}>{f.fase}</span>
+                        </div>
+                      ) : (
+                        <div style={{ height: 110, background: `repeating-linear-gradient(45deg,${f.color},${f.color} 10px,${f.color}dd 10px,${f.color}dd 20px)`, position: "relative", display: "grid", placeItems: "center" }}>
+                          <span style={{ position: "absolute", top: 8, left: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "rgba(0,0,0,.35)", padding: "3px 9px", borderRadius: 99 }}>{f.fase}</span>
+                          <Icon name="camera" size={24} color="rgba(255,255,255,.8)" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

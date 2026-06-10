@@ -1,4 +1,4 @@
-/* global React, Icon, StarMark */
+/* global React, Icon, StarMark, KlikaAPI, KlikaData */
 // ============================================================
 //  Pantalla 11 · Asistente Klika (chat)
 // ============================================================
@@ -41,16 +41,28 @@ function KlikaPanel({ onClose, onNav, mobile }) {
   ]);
   const [input, setInput] = useStateK("");
   const [typing, setTyping] = useStateK(false);
+  const [convId, setConvId] = useStateK(null);
   const endRef = useRefK(null);
 
   useEffectK(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, typing]);
 
-  function send(text) {
+  async function send(text) {
     const t = (text ?? input).trim();
     if (!t) return;
     setMsgs((m) => [...m, { from: "user", text: t }]);
     setInput("");
     setTyping(true);
+
+    if (window.KlikaData && KlikaData.conectado()) {
+      try {
+        const res = await KlikaData.klika.chat(t, convId);
+        setTyping(false);
+        if (res.conversacion_id) setConvId(res.conversacion_id);
+        setMsgs((m) => [...m, { from: "klika", text: res.respuesta ?? matchResp(t) }]);
+        return;
+      } catch (_) {}
+    }
+
     setTimeout(() => {
       setTyping(false);
       setMsgs((m) => [...m, { from: "klika", text: matchResp(t) }]);
