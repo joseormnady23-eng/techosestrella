@@ -38,6 +38,25 @@ Login de prueba: **8091110001 / Klika2024!** (rol dueño).
 - ✅ Frontend: cliente API + capa de recursos con adaptadores; Login y Dashboard conectados.
 - ⏳ Pendiente: conectar el resto de pantallas, PWA de campo (`klika-field`), integración real DGII (cert .p12), despliegue en Docker/Unraid.
 
+## Documentación
+
+- [`docs/API.md`](docs/API.md) — referencia de todos los endpoints (método, ruta, rol).
+- [`docs/Klika.postman_collection.json`](docs/Klika.postman_collection.json) — colección Postman importable (el login guarda el token solo).
+
+## Despliegue con Docker (Unraid)
+
+```bash
+cp backend/.env.docker backend/.env
+docker compose build
+docker compose up -d
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan storage:link
+# ERP en http://HOST:8080
+```
+
+CI: cada push corre los 28 tests + lint de PHP (`.github/workflows/ci.yml`).
+
 ## Stack y despliegue
 
 - **Backend:** Laravel 13, MySQL 8.4, Sanctum. **IA:** Ollama (`klika:latest`) en cnsia.

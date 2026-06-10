@@ -1,0 +1,104 @@
+{
+  "info": {
+    "name": "Klika ERP API",
+    "description": "Colección del API de Klika (Techos Estrella). Variables: base_url, token. Ejecuta 'Auth > Login' primero — guarda el token automáticamente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "const d = pm.response.json();",
+                "if (d.token) { pm.collectionVariables.set('token', d.token); console.log('token guardado'); }"
+              ] }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"login\": \"8091110001\",\n  \"password\": \"Klika2024!\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        { "name": "Me", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] } } },
+        { "name": "Logout", "request": { "method": "POST", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/auth/logout", "host": ["{{base_url}}"], "path": ["auth", "logout"] } } }
+      ]
+    },
+    {
+      "name": "General",
+      "item": [
+        { "name": "Dashboard", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/dashboard", "host": ["{{base_url}}"], "path": ["dashboard"] } } },
+        { "name": "Configuración", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/configuracion", "host": ["{{base_url}}"], "path": ["configuracion"] } } },
+        { "name": "Contabilidad · resumen", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/contabilidad/resumen", "host": ["{{base_url}}"], "path": ["contabilidad", "resumen"] } } }
+      ]
+    },
+    {
+      "name": "Clientes",
+      "item": [
+        { "name": "Listar", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/clientes", "host": ["{{base_url}}"], "path": ["clientes"] } } },
+        { "name": "Crear", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Familia Reyes\",\n  \"tipo\": \"persona\",\n  \"telefono\": \"8095550142\",\n  \"ciudad\": \"Santiago\"\n}" }, "url": { "raw": "{{base_url}}/clientes", "host": ["{{base_url}}"], "path": ["clientes"] } } }
+      ]
+    },
+    {
+      "name": "Obras",
+      "item": [
+        { "name": "Listar", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/obras", "host": ["{{base_url}}"], "path": ["obras"] } } },
+        { "name": "Ver", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/obras/1", "host": ["{{base_url}}"], "path": ["obras", "1"] } } },
+        { "name": "Clima de la obra", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/clima/obras/1", "host": ["{{base_url}}"], "path": ["clima", "obras", "1"] } } }
+      ]
+    },
+    {
+      "name": "Cotizaciones",
+      "item": [
+        { "name": "Calcular (preview)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    {\"descripcion\":\"Membrana\",\"metros_cuadrados\":100,\"manos\":2,\"factor_desperdicio\":1.10,\"rendimiento_usado\":5,\"unidad\":\"galón\",\"precio_unitario\":850},\n    {\"descripcion\":\"Mano de obra\",\"cantidad\":1,\"unidad\":\"servicio\",\"precio_unitario\":15000}\n  ],\n  \"descuento_tipo\":\"porcentaje\",\"descuento_valor\":10,\"itbis_activo\":true\n}" }, "url": { "raw": "{{base_url}}/cotizaciones/calcular", "host": ["{{base_url}}"], "path": ["cotizaciones", "calcular"] } } }
+      ]
+    },
+    {
+      "name": "Inventario",
+      "item": [
+        { "name": "Materiales", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/materiales", "host": ["{{base_url}}"], "path": ["materiales"] } } },
+        { "name": "Movimiento (entrada)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"material_id\": 1,\n  \"tipo\": \"entrada\",\n  \"cantidad\": 10,\n  \"motivo\": \"Compra\"\n}" }, "url": { "raw": "{{base_url}}/movimientos-inventario", "host": ["{{base_url}}"], "path": ["movimientos-inventario"] } } }
+      ]
+    },
+    {
+      "name": "Facturación",
+      "item": [
+        { "name": "Crear factura", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"tipo_comprobante\": \"B02\",\n  \"cliente_nombre\": \"Consumidor Final\",\n  \"items\": [{\"descripcion\":\"Servicio\",\"cantidad\":1,\"unidad\":\"servicio\",\"precio_unitario\":50000}]\n}" }, "url": { "raw": "{{base_url}}/facturas", "host": ["{{base_url}}"], "path": ["facturas"] } } },
+        { "name": "Secuencias NCF", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/ncf/secuencias", "host": ["{{base_url}}"], "path": ["ncf", "secuencias"] } } },
+        { "name": "Reporte 607", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/reportes/607?periodo=2026-06", "host": ["{{base_url}}"], "path": ["reportes", "607"], "query": [{ "key": "periodo", "value": "2026-06" }] } } }
+      ]
+    },
+    {
+      "name": "Asistencias (aplicador)",
+      "item": [
+        { "name": "Check-in", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"obra_id\": 1,\n  \"latitud\": 19.4517,\n  \"longitud\": -70.6970\n}" }, "url": { "raw": "{{base_url}}/asistencias/checkin", "host": ["{{base_url}}"], "path": ["asistencias", "checkin"] } } },
+        { "name": "Check-out", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"obra_id\": 1\n}" }, "url": { "raw": "{{base_url}}/asistencias/checkout", "host": ["{{base_url}}"], "path": ["asistencias", "checkout"] } } }
+      ]
+    },
+    {
+      "name": "RR.HH.",
+      "item": [
+        { "name": "Mi resumen de vacaciones", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": { "raw": "{{base_url}}/mi/vacaciones-resumen", "host": ["{{base_url}}"], "path": ["mi", "vacaciones-resumen"] } } },
+        { "name": "Solicitar ausencia", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"vacaciones\",\n  \"fecha_inicio\": \"2026-07-01\",\n  \"fecha_fin\": \"2026-07-05\"\n}" }, "url": { "raw": "{{base_url}}/ausencias", "host": ["{{base_url}}"], "path": ["ausencias"] } } }
+      ]
+    },
+    {
+      "name": "Klika IA",
+      "item": [
+        { "name": "Chat", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Accept", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"mensaje\": \"¿Qué obras muevo por la lluvia esta semana?\"\n}" }, "url": { "raw": "{{base_url}}/klika/chat", "host": ["{{base_url}}"], "path": ["klika", "chat"] } } }
+      ]
+    }
+  ]
+}
