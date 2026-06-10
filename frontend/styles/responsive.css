@@ -1,0 +1,144 @@
+/* ===========================================================
+   KLIKA · Capa responsive (móvil / tablet / escritorio)
+   Reglas centralizadas. Usan !important para ganar sobre los
+   estilos inline de React. Se activan con clases-gancho:
+   .r-page .r-main .r-form2 .r-form3 .r-form21 .r-tcard .r-table
+   .r-sidebar .r-scrim .r-hamburger .r-topbar .r-topsearch
+   .r-roletext .r-login .r-loginbrand .r-stick0 .r-clist
+   .r-klika .r-phoneframe .r-phonewrap
+   Breakpoints:  ≤1024 tablet · ≤860 drawer · ≤700 móvil · ≤560 compacto
+   =========================================================== */
+
+/* ---- Scrim del drawer (oculto por defecto) ---- */
+.r-scrim {
+  display: none; position: fixed; inset: 0;
+  background: rgba(20, 22, 26, .48); z-index: 55;
+  -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px);
+}
+
+/* ---- Hamburguesa (solo móvil) ---- */
+.r-hamburger { display: none !important; }
+
+/* ---- Columnas de tabla prescindibles: ocultar en pantallas medias ---- */
+@media (max-width: 1024px) {
+  .r-hide-narrow { display: none !important; }
+}
+
+/* ---- Tablas: el scroll horizontal se activa SIEMPRE que la tabla
+   exceda su tarjeta, sin importar el ancho de pantalla. Así no se
+   recortan columnas en el rango ~760–1050px (sidebar + padding). ---- */
+.r-tcard { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+/* ---- Rejillas de tarjetas-resumen: columnas equilibradas por breakpoint
+   (evita el "huérfano" 3+1 que produce auto-fit). ---- */
+@media (max-width: 1080px) {
+  .r-grid4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 560px) {
+  .r-grid4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .r-grid3 { grid-template-columns: 1fr !important; }
+}
+
+/* ---- Contabilidad: tarjetas de 2 columnas y cabeceras 1fr+auto ---- */
+@media (max-width: 760px) {
+  .r-grid2 { grid-template-columns: 1fr !important; }
+  .r-main2 { grid-template-columns: 1fr !important; }
+}
+
+/* =====================================================
+   ≤ 1024px · TABLET — apila columnas principales
+   ===================================================== */
+@media (max-width: 1024px) {
+  .r-main { grid-template-columns: 1fr !important; }
+  .r-stick0 { position: static !important; top: auto !important; max-height: none !important; }
+  .r-clist { position: static !important; max-height: none !important; }
+  .r-page {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+}
+
+/* =====================================================
+   ≤ 860px · sidebar se convierte en drawer deslizante
+   ===================================================== */
+@media (max-width: 860px) {
+  .r-sidebar {
+    position: fixed !important; top: 0; left: 0; bottom: 0;
+    width: min(84vw, 290px) !important;
+    transform: translateX(-100%);
+    transition: transform .26s cubic-bezier(.4, 0, .2, 1);
+    z-index: 60 !important; box-shadow: var(--sh-pop);
+  }
+  .r-sidebar.open { transform: translateX(0); }
+  .r-scrim.open { display: block; }
+  .r-hamburger { display: inline-flex !important; }
+  .r-topsearch { display: none !important; }
+}
+
+/* =====================================================
+   ≤ 760px · refuerzo de ancho mínimo en tablas estrechas
+   ===================================================== */
+@media (max-width: 760px) {
+  .r-table { min-width: 660px; }
+  .r-table-lg { min-width: 760px; }
+}
+
+/* =====================================================
+   ≤ 700px · MÓVIL — paddings, topbar, klika, tipografía
+   ===================================================== */
+@media (max-width: 700px) {
+  .r-page {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-top: 16px !important;
+  }
+  .r-topbar {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    gap: 8px !important;
+  }
+  .r-toptitle { font-size: 16px !important; }
+  .r-klika { width: 100vw !important; max-width: 100vw !important; }
+
+  /* formularios de modales -> una columna */
+  .r-form2, .r-form3, .r-form21 { grid-template-columns: 1fr !important; }
+
+  /* config: fila etiqueta+control -> apila */
+  .r-fieldrow { grid-template-columns: 1fr !important; gap: 8px !important; }
+  .r-threshold { grid-template-columns: 1fr !important; gap: 12px !important; }
+}
+
+/* =====================================================
+   ≤ 880px · Login — apila y oculta panel de marca
+   ===================================================== */
+@media (max-width: 880px) {
+  .r-login { grid-template-columns: 1fr !important; height: auto !important; min-height: 100vh; }
+  .r-loginbrand { display: none !important; }
+  .r-loginform { padding: 28px 18px !important; align-content: center; }
+}
+
+/* =====================================================
+   ≤ 560px · COMPACTO — esconde texto del selector de rol
+   y reduce el calendario
+   ===================================================== */
+@media (max-width: 560px) {
+  .r-roletext { display: none !important; }
+  .r-calcell { min-height: 64px !important; }
+}
+
+/* =====================================================
+   Marco de teléfono (Aplicador / Portal cliente)
+   ===================================================== */
+@media (max-width: 460px) {
+  .r-phoneframe {
+    width: 100vw !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .r-phoneframe .r-phonescreen { border-radius: 0 !important; }
+  .r-phonenotch { display: none !important; }
+  .r-phonewrap { width: 100% !important; }
+  .r-mobilestage { padding: 0 !important; min-height: 100dvh !important; }
+}

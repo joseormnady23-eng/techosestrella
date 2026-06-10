@@ -1,0 +1,172 @@
+/* ===========================================================
+   KLIKA · Sistema de diseño  ·  Techos Estrella SRL
+   Paleta derivada del logo (azul casita + estrella de colores)
+   =========================================================== */
+
+:root {
+  /* --- Marca / primario --- */
+  --blue-600: #1E7FC2;   /* primario: acciones, enlaces */
+  --blue-700: #176399;   /* hover / activo */
+  --blue-500: #3E97D6;
+  --blue-50:  #EAF4FB;   /* fondos suaves azules */
+  --blue-100: #D3E8F6;
+
+  /* --- Base oscura / neutros (grises metálicos del logo) --- */
+  --ink-900: #1A1A1A;    /* carbón: sidebar, texto fuerte */
+  --ink-800: #2A2B2E;
+  --ink-700: #3C3E42;
+  --ink-500: #6B6E73;
+  --ink-400: #8A8A8A;    /* gris texto logo */
+  --ink-300: #B5B5B5;    /* gris claro logo */
+  --ink-200: #D8DADE;
+  --ink-100: #E8EAEE;
+
+  /* --- Fondos --- */
+  --bg:       #F5F6F8;   /* área de contenido */
+  --surface:  #FFFFFF;
+  --surface-2:#FBFBFC;
+
+  /* --- Estados (vienen del logo) --- */
+  --green:   #3FAE4A;  --green-bg:  #E7F5E9;  --green-ink:  #2A7E33;
+  --amber:   #F2A33A;  --amber-bg:  #FDF1DF;  --amber-ink:  #B06E14;
+  --red:     #E0392B;  --red-bg:    #FBE6E4;  --red-ink:    #B0261A;
+  --purple:  #7B4FA0;  --purple-bg: #F0E9F5;  --purple-ink: #5E3A7C;
+
+  /* Acentos extra del logo (gráficos / etiquetas) */
+  --star-red:    #E0392B;
+  --star-orange: #F2A33A;
+  --star-green:  #3FAE4A;
+  --star-blue:   #1E7FC2;
+  --star-purple: #7B4FA0;
+
+  /* --- Radios --- */
+  --r-sm: 7px;
+  --r-md: 11px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-pill: 999px;
+
+  /* --- Sombras --- */
+  --sh-sm: 0 1px 2px rgba(20,22,26,.06), 0 1px 1px rgba(20,22,26,.04);
+  --sh-md: 0 4px 14px rgba(20,22,26,.07), 0 1px 3px rgba(20,22,26,.05);
+  --sh-lg: 0 14px 40px rgba(20,22,26,.13), 0 4px 12px rgba(20,22,26,.07);
+  --sh-pop: 0 18px 48px rgba(20,22,26,.22);
+
+  /* --- Tipografía --- */
+  --font-ui: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --side-w: 256px;
+  --top-h: 64px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  color: var(--ink-900);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+::selection { background: var(--blue-100); }
+
+/* Scrollbars discretos */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--ink-200); border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-300); background-clip: padding-box; border: 3px solid transparent; }
+
+/* ---- Utilidades de texto ---- */
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ====== Componentes base reutilizables ====== */
+
+/* Botones */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  padding: 0 15px; height: 40px; font-size: 14px; font-weight: 600;
+  white-space: nowrap; transition: background .14s, border-color .14s, box-shadow .14s, transform .04s;
+  line-height: 1; color: var(--ink-800); background: transparent;
+}
+.btn:active { transform: translateY(.5px); }
+.btn-primary { background: var(--blue-600); color: #fff; box-shadow: var(--sh-sm); }
+.btn-primary:hover { background: var(--blue-700); }
+.btn-ghost { background: var(--surface); border-color: var(--ink-200); color: var(--ink-800); }
+.btn-ghost:hover { background: var(--bg); border-color: var(--ink-300); }
+.btn-soft { background: var(--blue-50); color: var(--blue-700); }
+.btn-soft:hover { background: var(--blue-100); }
+.btn-quiet { background: transparent; color: var(--ink-500); }
+.btn-quiet:hover { background: var(--ink-100); color: var(--ink-800); }
+.btn-sm { height: 32px; padding: 0 11px; font-size: 13px; border-radius: 6px; }
+.btn-lg { height: 48px; padding: 0 22px; font-size: 15px; }
+.btn-icon { width: 40px; padding: 0; justify-content: center; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Tarjetas */
+.card {
+  background: var(--surface); border: 1px solid var(--ink-100);
+  border-radius: var(--r-lg); box-shadow: var(--sh-sm);
+}
+
+/* Badges de estado */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 10px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 700; letter-spacing: .1px; white-space: nowrap;
+}
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.badge-green  { background: var(--green-bg);  color: var(--green-ink); }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber-ink); }
+.badge-red    { background: var(--red-bg);    color: var(--red-ink); }
+.badge-blue   { background: var(--blue-50);   color: var(--blue-700); }
+.badge-purple { background: var(--purple-bg); color: var(--purple-ink); }
+.badge-gray   { background: var(--ink-100);   color: var(--ink-500); }
+
+/* Inputs */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field > label { font-size: 13px; font-weight: 600; color: var(--ink-700); }
+.input {
+  height: 44px; padding: 0 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--ink-200); background: var(--surface);
+  font-size: 14.5px; color: var(--ink-900); width: 100%;
+  transition: border-color .14s, box-shadow .14s;
+}
+.input::placeholder { color: var(--ink-400); }
+.input:focus { outline: none; border-color: var(--blue-500); box-shadow: 0 0 0 3.5px var(--blue-50); }
+.input-sm { height: 36px; font-size: 13.5px; }
+
+/* chip de filtro */
+.chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px;
+  border-radius: var(--r-pill); border: 1px solid var(--ink-200); background: var(--surface);
+  font-size: 13px; font-weight: 600; color: var(--ink-500); transition: all .14s;
+}
+.chip:hover { border-color: var(--ink-300); color: var(--ink-800); }
+.chip.active { background: var(--ink-900); border-color: var(--ink-900); color: #fff; }
+
+.divider { height: 1px; background: var(--ink-100); border: 0; margin: 0; }
+
+/* Sidebar nav item (CSS-driven hover/active para evitar desincronización) */
+.k-navitem {
+  position: relative; display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px;
+  border-radius: 9px; border: none; background: transparent; color: var(--ink-300);
+  font-size: 14px; font-weight: 600; text-align: left; width: 100%; cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.k-navitem:hover { background: rgba(255,255,255,.06); color: #fff; }
+.k-navitem.active { background: rgba(30,127,194,.16); color: #fff; }
+.k-navitem.active::before {
+  content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3.5px;
+  border-radius: 4px; background: var(--blue-500);
+}
+
+/* Animaciones */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scanmove { 0% { top: 8px; } 50% { top: calc(100% - 11px); } 100% { top: 8px; } }
+.fade-up { animation: fadeUp .34s cubic-bezier(.2,.7,.3,1) both; }
+.fade-in { animation: fadeIn .3s ease both; }

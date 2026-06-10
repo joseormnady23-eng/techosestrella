@@ -1,0 +1,19 @@
+# macOS / OS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editores
+.vscode/
+.idea/
+
+# Dependencias / artefactos (por si acaso, además de los .gitignore de cada subproyecto)
+**/node_modules/
+**/vendor/
+**/.env
+**/.env.backup
+**/.env.production
+
+# Logs
+*.log
