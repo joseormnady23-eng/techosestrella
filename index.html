@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Techos Estrella</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <header>
+    <nav class="navbar">
+      <div class="logo">⭐ Techos Estrella</div>
+      <ul class="nav-links">
+        <li><a href="#inicio">Inicio</a></li>
+        <li><a href="#servicios">Servicios</a></li>
+        <li><a href="#nosotros">Nosotros</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ul>
+      <button class="btn-nav" onclick="scrollToContact()">Cotizar gratis</button>
+      <button class="hamburger" onclick="toggleMenu()">&#9776;</button>
+    </nav>
+  </header>
+
+  <!-- HERO -->
+  <section id="inicio" class="hero">
+    <div class="hero-content">
+      <h1>Techos de calidad para tu hogar</h1>
+      <p>Instalación, reparación y mantenimiento de techos con más de 10 años de experiencia.</p>
+      <button class="btn-primary" onclick="scrollToContact()">Solicita tu cotización</button>
+    </div>
+  </section>
+
+  <!-- SERVICIOS -->
+  <section id="servicios" class="section">
+    <h2>Nuestros Servicios</h2>
+    <div class="cards">
+      <div class="card">
+        <span class="icon">🏗️</span>
+        <h3>Instalación</h3>
+        <p>Techos nuevos con materiales de primera calidad y garantía de por vida.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🔧</span>
+        <h3>Reparación</h3>
+        <p>Detectamos y solucionamos goteras, grietas y daños estructurales rápidamente.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🧹</span>
+        <h3>Mantenimiento</h3>
+        <p>Limpieza y revisión periódica para alargar la vida útil de tu techo.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🌧️</span>
+        <h3>Impermeabilización</h3>
+        <p>Protegemos tu techo contra la lluvia y la humedad con los mejores productos.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- NOSOTROS -->
+  <section id="nosotros" class="section section-alt">
+    <div class="about-grid">
+      <div class="about-text">
+        <h2>¿Por qué elegir Techos Estrella?</h2>
+        <ul class="check-list">
+          <li>✅ Más de 10 años de experiencia</li>
+          <li>✅ Personal certificado y capacitado</li>
+          <li>✅ Materiales de alta calidad</li>
+          <li>✅ Presupuesto sin costo</li>
+          <li>✅ Garantía en todos nuestros trabajos</li>
+          <li>✅ Atención personalizada 24/7</li>
+        </ul>
+      </div>
+      <div class="about-stats">
+        <div class="stat"><span class="stat-num">500+</span><span>Proyectos completados</span></div>
+        <div class="stat"><span class="stat-num">10+</span><span>Años de experiencia</span></div>
+        <div class="stat"><span class="stat-num">100%</span><span>Clientes satisfechos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACTO -->
+  <section id="contacto" class="section">
+    <h2>Contáctanos</h2>
+    <p class="section-subtitle">Escríbenos o llámanos y te respondemos a la brevedad.</p>
+    <form class="contact-form" onsubmit="handleSubmit(event)">
+      <div class="form-row">
+        <input type="text" placeholder="Tu nombre" required />
+        <input type="tel" placeholder="Tu teléfono" required />
+      </div>
+      <input type="email" placeholder="Tu correo electrónico" required />
+      <textarea placeholder="Describe tu proyecto o consulta..." rows="4" required></textarea>
+      <button type="submit" class="btn-primary">Enviar mensaje</button>
+      <p id="form-msg" class="form-msg"></p>
+    </form>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>© 2026 Techos Estrella — Todos los derechos reservados.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
