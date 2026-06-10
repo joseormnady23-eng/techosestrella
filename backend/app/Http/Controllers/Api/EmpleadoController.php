@@ -59,4 +59,10 @@ class EmpleadoController extends Controller
     {
         return response()->json($this->vacaciones->resumen($usuario));
     }
+
+    /** Resumen de vacaciones del usuario autenticado (para la PWA de campo). */
+    public function miResumen(Request $request): JsonResponse
+    {
+        return response()->json($this->vacaciones->resumen($request->user()));
+    }
 }

@@ -8,8 +8,9 @@ facturación electrónica (e-CF/DGII), RR.HH. y un asistente de IA (Klika).
 
 | Carpeta | Qué es |
 |---------|--------|
-| [`backend/`](backend/) | **API REST** — Laravel 13 + MySQL + Sanctum. Toda la lógica, ~125 endpoints, servicios (cotizador, clima, vacaciones, e-CF, Klika), PDFs y tests. |
+| [`backend/`](backend/) | **API REST** — Laravel 13 + MySQL + Sanctum. Toda la lógica, ~126 endpoints, servicios (cotizador, clima, vacaciones, e-CF, Klika), PDFs y tests. |
 | [`frontend/`](frontend/) | **ERP web** — prototipo React (UMD + Babel en navegador) exportado de Claude Design, con el Login y la capa de datos ya conectados al backend. |
+| [`field/`](field/) | **PWA de campo (`klika-field`)** — app móvil offline para aplicadores: obras del día, check-in/out con GPS, fotos, materiales y vacaciones. HTML/CSS/JS vanilla. |
 
 Cada carpeta tiene su propio `README.md` con instrucciones detalladas.
 

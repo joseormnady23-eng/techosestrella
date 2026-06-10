@@ -1,0 +1,113 @@
+/* Klika Campo · estilos móviles (alto contraste, targets grandes para uso en obra) */
+:root {
+  --blue: #1E7FC2; --blue-d: #166299;
+  --ink: #1A1A1A; --ink-700: #3A3A3A; --ink-400: #8A8A8A; --ink-200: #D5D7DB;
+  --bg: #F5F6F8; --surface: #fff;
+  --green: #3FAE4A; --green-bg: #E6F4E7;
+  --amber: #F2A33A; --amber-bg: #FCEFD9;
+  --red: #E0392B; --red-bg: #FBE6E4;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  font-family: -apple-system, "Figtree", "Segoe UI", system-ui, sans-serif;
+  background: var(--ink); color: var(--ink);
+  font-size: 17px; line-height: 1.4;
+}
+#app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg);
+  display: flex; flex-direction: column; position: relative; }
+
+/* Banner offline */
+#offline-banner { display: none; background: var(--amber-bg); color: #7a4d08;
+  padding: 10px 16px; font-size: 14px; font-weight: 600; text-align: center; }
+body.offline #offline-banner { display: block; }
+
+/* Header */
+.hdr { background: var(--ink); color: #fff; padding: 18px 18px 16px; }
+.hdr h1 { margin: 0; font-size: 22px; font-weight: 800; }
+.hdr .sub { color: #B5B5B5; font-size: 14px; margin-top: 2px; }
+.hdr-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Contenido */
+.content { flex: 1; padding: 16px; padding-bottom: 96px; overflow-y: auto; }
+.section-lbl { font-size: 13px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--ink-400); margin: 18px 4px 10px; }
+
+/* Cards de obra (grandes) */
+.card { background: var(--surface); border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  padding: 18px; margin-bottom: 14px; border: 1px solid #ECEDF0; }
+.obra-card { display: block; width: 100%; text-align: left; border: 1px solid #ECEDF0; cursor: pointer; }
+.obra-card .titulo { font-size: 18px; font-weight: 700; }
+.obra-card .meta { color: var(--ink-400); font-size: 14px; margin-top: 3px; }
+
+/* Botones gigantes */
+.btn { display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; min-height: 64px; border: none; border-radius: 14px;
+  font-size: 18px; font-weight: 700; cursor: pointer; padding: 0 18px; }
+.btn:active { transform: scale(.98); }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-red { background: var(--red); color: #fff; }
+.btn-gray { background: var(--ink-200); color: var(--ink); }
+.btn-ghost { background: var(--surface); color: var(--ink); border: 2px solid var(--ink-200); }
+.btn[disabled] { opacity: .5; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.btn-row .full { grid-column: 1 / -1; }
+
+/* Badges de clima/estado */
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 99px;
+  font-size: 13px; font-weight: 700; }
+.b-green { background: var(--green-bg); color: #2a7d33; }
+.b-amber { background: var(--amber-bg); color: #92610d; }
+.b-red { background: var(--red-bg); color: #b0261a; }
+.b-blue { background: #E4F0FA; color: var(--blue-d); }
+.b-gray { background: #ECEDF0; color: var(--ink-400); }
+
+/* Tira de clima 7 días */
+.clima { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.clima .d { border-radius: 12px; padding: 10px 0; text-align: center; }
+.clima .dn { font-size: 12px; font-weight: 700; color: var(--ink-400); }
+.clima .dd { font-size: 18px; font-weight: 800; }
+.clima .pp { font-size: 11px; margin-top: 2px; }
+
+/* Inputs */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.input { width: 100%; min-height: 56px; border: 2px solid var(--ink-200); border-radius: 12px;
+  padding: 0 14px; font-size: 17px; background: var(--surface); }
+textarea.input { padding: 12px 14px; min-height: 90px; }
+
+/* Selector de tipo de foto */
+.tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tipo-btn { min-height: 72px; border-radius: 14px; border: 2px solid var(--ink-200); background: var(--surface);
+  font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.tipo-btn.on { border-color: var(--blue); background: #E4F0FA; }
+
+/* Bottom nav */
+.nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+  display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface);
+  border-top: 1px solid var(--ink-200); }
+.nav button { background: none; border: none; padding: 10px 0 14px; font-size: 12px; font-weight: 700;
+  color: var(--ink-400); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.nav button.on { color: var(--blue); }
+.nav .ic { font-size: 22px; line-height: 1; }
+
+/* Login */
+.login { display: flex; flex-direction: column; justify-content: center; min-height: 100vh;
+  padding: 28px; background: var(--ink); color: #fff; }
+.login h1 { font-size: 28px; font-weight: 900; margin: 0 0 4px; }
+.login .input { color: var(--ink); }
+.login .err { background: var(--red-bg); color: #b0261a; padding: 12px; border-radius: 10px;
+  font-weight: 700; font-size: 15px; margin-bottom: 14px; }
+
+/* Util */
+.center { text-align: center; }
+.muted { color: var(--ink-400); }
+.big-num { font-size: 56px; font-weight: 900; line-height: 1; }
+.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 50;
+  background: var(--ink); color: #fff; padding: 14px 20px; border-radius: 12px; font-weight: 700;
+  font-size: 15px; max-width: 90%; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.empty { text-align: center; color: var(--ink-400); padding: 40px 20px; font-size: 16px; }
+.spin { width: 28px; height: 28px; border: 3px solid var(--ink-200); border-top-color: var(--blue);
+  border-radius: 50%; animation: r 1s linear infinite; margin: 30px auto; }
+@keyframes r { to { transform: rotate(360deg); } }

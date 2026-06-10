@@ -185,6 +185,9 @@ Route::middleware('auth:sanctum')->group(function () {
             ->only(['index', 'store', 'update'])
             ->parameters(['empleados' => 'empleado']);
     });
+    // Resumen de vacaciones del propio usuario (cualquier rol — para la PWA de campo).
+    Route::get('mi/vacaciones-resumen', [EmpleadoController::class, 'miResumen']);
+
     Route::get('ausencias', [AusenciaController::class, 'index']);
     Route::get('ausencias/calendario', [AusenciaController::class, 'calendario']);
     Route::post('ausencias', [AusenciaController::class, 'store']);
