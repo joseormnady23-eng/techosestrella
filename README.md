@@ -16,6 +16,9 @@ Cada carpeta tiene su propio `README.md` con instrucciones detalladas.
 
 ## Arranque rápido (desarrollo local)
 
+> 🪟 **¿En Windows con Laragon?** Sigue la guía dedicada: [`docs/SETUP-WINDOWS.md`](docs/SETUP-WINDOWS.md)
+> (incluye un `backend\setup-windows.bat` que hace todo solo). Lo de abajo es la versión genérica.
+
 ```bash
 # Backend (http://127.0.0.1:8000)
 cd backend
