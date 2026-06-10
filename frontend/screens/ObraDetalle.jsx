@@ -1,10 +1,10 @@
-/* global React, Icon, CLIENTES, CUADRILLAS, ESTADOS, COND_META, QuoteEngine, money0 */
+/* global React, Icon, CLIENTES, CUADRILLAS, ESTADOS, COND_META, QuoteEngine, money0, KlikaData */
 // ============================================================
 //  Pantalla 4 · Detalle de obra
 // ============================================================
-const { useState: useStateOD } = React;
+const { useState: useStateOD, useEffect: useEffectOD } = React;
 
-const FOTOS = [
+const FOTOS_MOCK = [
   { id: 1, fase: "Antes", color: "#9aa3ad", visible: true, nota: "Filtraciones esquina norte" },
   { id: 2, fase: "Antes", color: "#8a93a0", visible: true, nota: "Pozas de agua estancada" },
   { id: 3, fase: "Durante", color: "#7fa9c9", visible: true, nota: "Aplicación de primer" },
@@ -13,19 +13,74 @@ const FOTOS = [
   { id: 6, fase: "Después", color: "#8fc095", visible: true, nota: "1ra mano de membrana" },
 ];
 
-function ObraDetalle({ obra, tab, setTab, onNav, role, onPortal }) {
-  const [mapaVisible, setMapaVisible] = useStateOD(obra?.mapa ?? true);
-  const [fotos, setFotos] = useStateOD(FOTOS);
+function ObraDetalle({ obra: obraProp, obraId, tab, setTab, onNav, role, onPortal }) {
+  const [obra, setObra] = useStateOD(obraProp || null);
+  const [mapaVisible, setMapaVisible] = useStateOD(obraProp?.mapa ?? true);
+  const [fotos, setFotos] = useStateOD(FOTOS_MOCK);
   const [filtroFase, setFiltroFase] = useStateOD("Todas");
   const [garAnios, setGarAnios] = useStateOD(7);
-  const [estado, setEstado] = useStateOD(obra?.estado || "cotizada");
-  const [secciones, setSecciones] = useStateOD(() => (obra?.secciones || []).map((s) => ({ ...s, factor: s.factor ?? (window.FACTOR_COND?.[s.cond] ?? 1) })));
+  const [estado, setEstado] = useStateOD(obraProp?.estado || "cotizada");
+  const [secciones, setSecciones] = useStateOD(() => (obraProp?.secciones || []).map((s) => ({ ...s, factor: s.factor ?? (window.FACTOR_COND?.[s.cond] ?? 1) })));
   const [mapaLog, setMapaLog] = useStateOD(null);
+  const [guardandoEstado, setGuardandoEstado] = useStateOD(false);
+  const [guardandoGarantia, setGuardandoGarantia] = useStateOD(false);
 
-  if (!obra) return <div style={{ padding: 40 }}>Obra no encontrada.</div>;
+  const backendId = obra?._id ?? (typeof obraId === "number" ? obraId : null);
 
-  const cliente = CLIENTES.find((c) => c.id === obra.cliente);
-  const cu = CUADRILLAS.find((c) => c.id === obra.cuadrilla);
+  useEffectOD(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    const id = (obraProp?._id) ?? (typeof obraId === "number" ? obraId : null);
+    if (!id) return;
+    KlikaData.obras.ver(id).then((raw) => {
+      const data = raw.data ?? raw;
+      const mapped = KlikaData.map.obra(data);
+      setObra({ ...mapped, direccion: data.direccion ?? obraProp?.direccion ?? "", secciones: data.secciones ?? obraProp?.secciones ?? [] });
+      setEstado(mapped.estado);
+      const secs = (data.secciones || []).map((s) => ({ ...s, factor: s.factor ?? (window.FACTOR_COND?.[s.condicion ?? s.cond] ?? 1), cond: s.condicion ?? s.cond ?? "bueno" }));
+      if (secs.length) setSecciones(secs);
+      setMapaVisible(data.ubicacion_visible ?? true);
+    }).catch(() => {});
+
+    KlikaData.obras.fotos(id).then((res) => {
+      const arr = res.data ?? res;
+      if (arr?.length) setFotos(arr.map((f) => ({ id: f.id, fase: f.fase ?? "Antes", color: "#7fa9c9", visible: f.visible ?? true, nota: f.descripcion ?? "" })));
+    }).catch(() => {});
+
+    KlikaData.obras.garantia(id).then((res) => {
+      const g = res.data ?? res;
+      if (g?.anios) setGarAnios(g.anios);
+    }).catch(() => {});
+  }, [obraId]);
+
+  async function cambiarEstado(nuevoEstado) {
+    setEstado(nuevoEstado);
+    if (!window.KlikaData || !KlikaData.conectado() || !backendId) return;
+    setGuardandoEstado(true);
+    try { await KlikaData.obras.actualizar(backendId, { estado: nuevoEstado }); }
+    catch (e) { console.error("cambiarEstado", e); } finally { setGuardandoEstado(false); }
+  }
+
+  async function guardarGarantia(anios) {
+    setGarAnios(anios);
+    if (!window.KlikaData || !KlikaData.conectado() || !backendId) return;
+    setGuardandoGarantia(true);
+    try { await KlikaData.obras.guardarGarantia(backendId, { anios }); }
+    catch (e) { console.error("guardarGarantia", e); } finally { setGuardandoGarantia(false); }
+  }
+
+  async function toggleMapa() {
+    const next = !mapaVisible;
+    setMapaVisible(next);
+    setMapaLog({ quien: window.ROLES?.[role]?.nombre || "Usuario", accion: next ? "activó" : "ocultó" });
+    if (window.KlikaData && KlikaData.conectado() && backendId) {
+      KlikaData.obras.ubicacionVisible(backendId, next).catch(() => {});
+    }
+  }
+
+  if (!obra) return <div style={{ padding: 40, color: "var(--ink-400)" }}>Cargando obra…</div>;
+
+  const cliente = CLIENTES.find((c) => c.id === obra.cliente || c._id == obra.cliente);
+  const cu = CUADRILLAS.find((c) => c.id === obra.cuadrilla || c._id == obra.cuadrilla);
   const esDueno = role === "dueno";
   const totalM2 = secciones.reduce((a, s) => a + (+s.m2 || 0), 0);
   function setSeccion(i, key, val) {
@@ -33,11 +88,7 @@ function ObraDetalle({ obra, tab, setTab, onNav, role, onPortal }) {
   }
   function addSeccion() { setSecciones((arr) => [...arr, { nombre: "Nueva sección", m2: 0, cond: "bueno", manos: 2, factor: window.FACTOR_COND?.bueno ?? 1 }]); }
   function delSeccion(i) { setSecciones((arr) => arr.filter((_, idx) => idx !== i)); }
-  function toggleMapa() {
-    const next = !mapaVisible;
-    setMapaVisible(next);
-    setMapaLog({ quien: window.ROLES?.[role]?.nombre || "Usuario", accion: next ? "activó" : "ocultó" });
-  }
+  // toggleMapa is defined above in the hooks section
 
   const tabs = [
     { k: "resumen", label: "Resumen" },
@@ -247,14 +298,14 @@ function ObraDetalle({ obra, tab, setTab, onNav, role, onPortal }) {
                       <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }}>Solo el dueño puede ajustar el plazo</div>
                     </div>
                     <div style={od.stepper}>
-                      <button style={od.stepBtn} onClick={() => setGarAnios((y) => Math.max(1, y - 1))} aria-label="Restar año"><Icon name="minus" size={16} /></button>
+                      <button style={od.stepBtn} onClick={() => guardarGarantia(Math.max(1, garAnios - 1))} aria-label="Restar año"><Icon name="minus" size={16} /></button>
                       <div style={od.stepVal}>
                         <input type="number" min={1} max={25} value={garAnios}
-                          onChange={(e) => setGarAnios(Math.max(1, Math.min(25, +e.target.value || 1)))}
+                          onChange={(e) => guardarGarantia(Math.max(1, Math.min(25, +e.target.value || 1)))}
                           className="tnum" style={od.stepInput} />
                         <span style={{ fontSize: 12.5, color: "var(--ink-400)", fontWeight: 600 }}>{garAnios === 1 ? "año" : "años"}</span>
                       </div>
-                      <button style={od.stepBtn} onClick={() => setGarAnios((y) => Math.min(25, y + 1))} aria-label="Sumar año"><Icon name="plus" size={16} /></button>
+                      <button style={od.stepBtn} onClick={() => guardarGarantia(Math.min(25, garAnios + 1))} aria-label="Sumar año"><Icon name="plus" size={16} /></button>
                     </div>
                   </div>
                 )}
@@ -285,7 +336,7 @@ function ObraDetalle({ obra, tab, setTab, onNav, role, onPortal }) {
             {esDueno && (
               <div style={{ marginTop: 12 }}>
                 <div style={od.sideLabel}>Cambiar estado</div>
-                <select value={estado} onChange={(e) => setEstado(e.target.value)} className="input" style={{ height: 40 }}>
+                <select value={estado} onChange={(e) => cambiarEstado(e.target.value)} className="input" style={{ height: 40 }} disabled={guardandoEstado}>
                   {["cotizada", "aprobada", "proceso", "pausada", "terminada", "cancelada"].map((k) => (
                     <option key={k} value={k}>{ESTADOS[k].label}</option>
                   ))}

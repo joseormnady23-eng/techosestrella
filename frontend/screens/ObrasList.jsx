@@ -1,40 +1,81 @@
-/* global React, Icon, OBRAS, ESTADOS, CUADRILLAS, CLIENTES, money0 */
+/* global React, Icon, OBRAS, ESTADOS, CUADRILLAS, CLIENTES, money0, KlikaData */
 // ============================================================
 //  Pantalla 3 · Lista de obras
 // ============================================================
-const { useState: useStateObras } = React;
+const { useState: useStateObras, useEffect: useEffectObras } = React;
 
 function ObrasList({ onNav, role }) {
+  const [obras, setObras] = useStateObras(OBRAS);
+  const [clientes, setClientes] = useStateObras(CLIENTES);
+  const [cuadrillas, setCuadrillas] = useStateObras(CUADRILLAS);
   const [filtro, setFiltro] = useStateObras("todas");
   const [q, setQ] = useStateObras("");
-  const [vista, setVista] = useStateObras("tabla"); // tabla | tarjetas
+  const [vista, setVista] = useStateObras("tabla");
   const [modal, setModal] = useStateObras(false);
-  const [tick, setTick] = useStateObras(0);
-  const nextCode = "OB-" + (Math.max(...OBRAS.map((o) => +o.id.split("-")[1])) + 1);
-  const obraVacia = () => ({ cliente: CLIENTES[0].id, titulo: "", direccion: "", ciudad: "", lat: "", lng: "", inicio: "", fin: "", cuadrilla: "", supervisor: "" });
+  const [creando, setCreando] = useStateObras(false);
+  const obraVacia = () => ({ cliente: clientes[0]?.id || "", titulo: "", direccion: "", ciudad: "", lat: "", lng: "", inicio: "", fin: "", cuadrilla: "", supervisor: "" });
   const [form, setForm] = useStateObras(obraVacia);
   const esDueno = role === "dueno";
 
-  function crearObra() {
+  useEffectObras(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.obras.lista().then((res) => {
+      const arr = (res.data ?? res).map(KlikaData.map.obra);
+      setObras(arr);
+    }).catch(() => {});
+    KlikaData.clientes.lista().then((res) => {
+      setClientes((res.data ?? res).map(KlikaData.map.cliente));
+    }).catch(() => {});
+    KlikaData.cuadrillas.lista().then((res) => {
+      setCuadrillas(res.data ?? res);
+    }).catch(() => {});
+  }, []);
+
+  async function crearObra() {
     if (!form.titulo.trim()) return;
-    const cli = CLIENTES.find((c) => c.id === form.cliente);
-    OBRAS.unshift({
-      id: nextCode, cliente: form.cliente, clienteNom: cli?.nombre || "—", titulo: form.titulo.trim(),
-      estado: "cotizada", cuadrilla: form.cuadrilla || null, supervisor: form.supervisor.trim(),
-      direccion: form.direccion.trim(), ciudad: form.ciudad.trim(),
-      lat: form.lat, lng: form.lng, mapa: true,
-      inicio: form.inicio || "—", fin: form.fin || "—", avance: 0, total: 0,
-      secciones: [{ nombre: "Sección 1", m2: 0, cond: "bueno", manos: 2 }],
-    });
-    setForm(obraVacia());
-    setModal(false);
-    setTick((t) => t + 1);
-    onNav("obra", nextCode);
+    setCreando(true);
+    try {
+      if (window.KlikaData && KlikaData.conectado()) {
+        const cli = clientes.find((c) => c.id === form.cliente);
+        const payload = {
+          cliente_id: form.cliente,
+          titulo: form.titulo.trim(),
+          direccion: form.direccion.trim() || null,
+          ciudad: form.ciudad.trim() || null,
+          latitud: form.lat || null,
+          longitud: form.lng || null,
+          fecha_inicio_estimada: form.inicio || null,
+          fecha_fin_estimada: form.fin || null,
+          cuadrilla_id: form.cuadrilla || null,
+          supervisor: form.supervisor.trim() || null,
+        };
+        const raw = await KlikaData.obras.crear(payload);
+        const nueva = KlikaData.map.obra(raw.data ?? raw);
+        setObras((arr) => [nueva, ...arr]);
+        setModal(false);
+        setForm(obraVacia());
+        onNav("obra", nueva._id ?? nueva.id);
+      } else {
+        const nextCode = "OB-" + (Math.max(0, ...obras.map((o) => +String(o.id).split("-")[1])) + 1);
+        const cli = clientes.find((c) => c.id === form.cliente);
+        const nueva = {
+          id: nextCode, _id: nextCode, cliente: form.cliente, clienteNom: cli?.nombre || "—",
+          titulo: form.titulo.trim(), estado: "cotizada", cuadrilla: form.cuadrilla || null,
+          direccion: form.direccion.trim(), ciudad: form.ciudad.trim(),
+          inicio: form.inicio || "—", fin: form.fin || "—", avance: 0, total: 0,
+          secciones: [{ nombre: "Sección 1", m2: 0, cond: "bueno", manos: 2 }],
+        };
+        setObras((arr) => [nueva, ...arr]);
+        setModal(false);
+        setForm(obraVacia());
+        onNav("obra", nextCode);
+      }
+    } catch (e) { console.error("crearObra", e); } finally { setCreando(false); }
   }
 
-  const counts = OBRAS.reduce((a, o) => { a[o.estado] = (a[o.estado] || 0) + 1; return a; }, {});
+  const counts = obras.reduce((a, o) => { a[o.estado] = (a[o.estado] || 0) + 1; return a; }, {});
   const filtros = [
-    { k: "todas", label: "Todas", n: OBRAS.length },
+    { k: "todas", label: "Todas", n: obras.length },
     { k: "proceso", label: "En proceso", n: counts.proceso || 0 },
     { k: "aprobada", label: "Aprobadas", n: counts.aprobada || 0 },
     { k: "cotizada", label: "Cotizadas", n: counts.cotizada || 0 },
@@ -42,7 +83,7 @@ function ObrasList({ onNav, role }) {
     { k: "terminada", label: "Terminadas", n: counts.terminada || 0 },
   ];
 
-  let lista = OBRAS.filter((o) => filtro === "todas" || o.estado === filtro);
+  let lista = obras.filter((o) => filtro === "todas" || o.estado === filtro);
   if (q) lista = lista.filter((o) => (o.titulo + o.clienteNom + o.id).toLowerCase().includes(q.toLowerCase()));
 
   return (
@@ -86,9 +127,9 @@ function ObrasList({ onNav, role }) {
             </thead>
             <tbody>
               {lista.map((o) => {
-                const cu = CUADRILLAS.find((c) => c.id === o.cuadrilla);
+                const cu = cuadrillas.find((c) => c.id === o.cuadrilla);
                 return (
-                  <tr key={o.id} style={ob.tr} onClick={() => onNav("obra", o.id)}
+                  <tr key={o.id} style={ob.tr} onClick={() => onNav("obra", o._id ?? o.id)}
                     onMouseEnter={(e)=>e.currentTarget.style.background="var(--surface-2)"}
                     onMouseLeave={(e)=>e.currentTarget.style.background="transparent"}>
                     <td style={ob.td}><span className="mono" style={{ fontWeight: 600, fontSize: 13 }}>{o.id}</span></td>
@@ -123,9 +164,9 @@ function ObrasList({ onNav, role }) {
       ) : (
         <div style={ob.cards}>
           {lista.map((o) => {
-            const cu = CUADRILLAS.find((c) => c.id === o.cuadrilla);
+            const cu = cuadrillas.find((c) => c.id === o.cuadrilla);
             return (
-              <button key={o.id} className="card" style={ob.cardItem} onClick={() => onNav("obra", o.id)}
+              <button key={o.id} className="card" style={ob.cardItem} onClick={() => onNav("obra", o._id ?? o.id)}
                 onMouseEnter={(e)=>e.currentTarget.style.boxShadow="var(--sh-md)"}
                 onMouseLeave={(e)=>e.currentTarget.style.boxShadow="var(--sh-sm)"}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -156,7 +197,7 @@ function ObrasList({ onNav, role }) {
             <div style={ob.modalHead}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Nueva obra</h3>
-                <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }}>Código <span className="mono" style={{ fontWeight: 700, color: "var(--blue-700)" }}>{nextCode}</span> · generado automáticamente</div>
+                <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }}>El código se genera automáticamente al guardar.</div>
               </div>
               <button className="btn btn-icon btn-quiet btn-sm" onClick={() => setModal(false)}><Icon name="x" size={18} /></button>
             </div>
@@ -164,7 +205,7 @@ function ObrasList({ onNav, role }) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="r-form2">
                 <div className="field"><label>Cliente</label>
                   <select className="input" value={form.cliente} onChange={(e) => setForm({ ...form, cliente: e.target.value })}>
-                    {CLIENTES.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
                 </div>
                 <div className="field"><label>Supervisor</label>
@@ -193,13 +234,13 @@ function ObrasList({ onNav, role }) {
               <div className="field"><label>Cuadrilla asignada</label>
                 <select className="input" value={form.cuadrilla} onChange={(e) => setForm({ ...form, cuadrilla: e.target.value })}>
                   <option value="">Sin asignar</option>
-                  {CUADRILLAS.map((cu) => <option key={cu.id} value={cu.id}>{cu.nombre}</option>)}
+                  {cuadrillas.map((cu) => <option key={cu.id} value={cu.id}>{cu.nombre}</option>)}
                 </select>
               </div>
             </div>
             <div style={ob.modalFoot}>
               <button className="btn btn-ghost" onClick={() => setModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" disabled={!form.titulo.trim()} onClick={crearObra}><Icon name="check" size={16} /> Crear obra</button>
+              <button className="btn btn-primary" disabled={!form.titulo.trim() || creando} onClick={crearObra}><Icon name="check" size={16} /> {creando ? "Creando…" : "Crear obra"}</button>
             </div>
           </div>
         </div>

@@ -1,16 +1,42 @@
-/* global React, Icon, NCF_SECUENCIAS, TIPO_NCF, ncfDisponibles, ncfPct */
+/* global React, Icon, NCF_SECUENCIAS, TIPO_NCF, ncfDisponibles, ncfPct, KlikaData */
 // ============================================================
 //  CONTABILIDAD · Secuencias de NCF autorizadas por la DGII
 // ============================================================
-const { useState: useStateN } = React;
+const { useState: useStateN, useEffect: useEffectN } = React;
+
+function mapSeq(s) {
+  return {
+    id: s.id, tipo: s.tipo ?? "B01",
+    prefijo: s.prefijo ?? "B01",
+    desde: Number(s.desde ?? s.secuencia_desde ?? 1),
+    hasta: Number(s.hasta ?? s.secuencia_hasta ?? 99999999),
+    actual: Number(s.actual ?? s.secuencia_actual ?? 1),
+    vence: s.fecha_vencimiento ?? s.vence ?? "—",
+  };
+}
 
 function SecuenciasNCF({ role }) {
   const [secs, setSecs] = useStateN(() => window.NCF_SECUENCIAS.map((s) => ({ ...s })));
   const [edit, setEdit] = useStateN(null);
 
+  useEffectN(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.ncf.secuencias().then((res) => {
+      const arr = (res.data ?? res).map(mapSeq);
+      if (arr.length) setSecs(arr);
+    }).catch(() => {});
+  }, []);
+
   const alertas = secs.filter((s) => ncfDisponibles(s) === 0 || ncfPct(s) < 0.1).length;
 
-  function actualizar(tipo, campos) { setSecs((arr) => arr.map((s) => s.tipo === tipo ? { ...s, ...campos } : s)); setEdit(null); }
+  async function actualizar(tipo, campos) {
+    setSecs((arr) => arr.map((s) => s.tipo === tipo ? { ...s, ...campos } : s));
+    setEdit(null);
+    const sec = secs.find((s) => s.tipo === tipo);
+    if (sec?.id && window.KlikaData && KlikaData.conectado()) {
+      KlikaData.ncf.actualizar(sec.id, { prefijo: campos.prefijo, secuencia_desde: campos.desde, secuencia_hasta: campos.hasta, secuencia_actual: campos.actual, fecha_vencimiento: campos.vence }).catch(() => {});
+    }
+  }
 
   return (
     <div style={ns.page} className="r-page">

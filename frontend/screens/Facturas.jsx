@@ -1,9 +1,36 @@
-/* global React, Icon, FACTURAS, TIPO_NCF, ECF_META, CLIENTES, OBRAS, COTIZ_INDEP, NCF_SECUENCIAS, METODOS_PAGO, facturaCalc, facturaPagada, money, money0, FacturaDetalle */
+/* global React, Icon, FACTURAS, TIPO_NCF, ECF_META, CLIENTES, OBRAS, COTIZ_INDEP, NCF_SECUENCIAS, METODOS_PAGO, facturaCalc, facturaPagada, money, money0, FacturaDetalle, KlikaData */
 // ============================================================
 //  CONTABILIDAD · Facturas (ventas / 607)
 //  Lista · crear (desde cotización o manual) · detalle
 // ============================================================
-const { useState: useStateF, useMemo: useMemoF } = React;
+const { useState: useStateF, useMemo: useMemoF, useEffect: useEffectF } = React;
+
+function mapFactura(f) {
+  return {
+    id: f.id,
+    ncf: f.ncf ?? null,
+    tipo: f.tipo_ncf ?? "b01",
+    ecf: f.estado_ecf ?? "pendiente",
+    fecha: (f.fecha_emision ?? "").slice(0, 10),
+    fechaISO: f.fecha_emision ?? "",
+    cliente: f.cliente?.nombre ?? "",
+    rnc: f.cliente?.rnc_cedula ?? "",
+    clienteId: f.cliente_id ?? null,
+    obraId: f.obra_id ?? null,
+    items: (f.items ?? []).map((it) => ({
+      desc: it.descripcion ?? "", cant: Number(it.cantidad ?? 1),
+      unidad: it.unidad ?? "ud", precio: Number(it.precio_unitario ?? 0), itbis: Number(it.itbis_pct ?? 18),
+    })),
+    pagos: (f.pagos ?? []).map((p) => ({
+      id: p.id, monto: Number(p.monto ?? 0), metodo: p.metodo ?? "efectivo",
+      fecha: (p.created_at ?? "").slice(0, 10), nota: p.nota ?? "",
+    })),
+    anulada: f.anulada ?? false,
+    motivoAnulacion: f.motivo_anulacion ?? null,
+    motivoRechazo: f.motivo_rechazo ?? null,
+    trackId: f.track_id ?? null,
+  };
+}
 
 const MESES_OPC = [
   { v: "todos", label: "Todos los meses" },
@@ -22,17 +49,24 @@ function genNCF(tipo, facturas) {
 
 function Facturas({ role }) {
   const [facturas, setFacturas] = useStateF(() => window.FACTURAS.map((f) => ({ ...f, items: f.items.map((i) => ({ ...i })), pagos: (f.pagos || []).map((p) => ({ ...p })) })));
-  const [view, setView] = useStateF("list");           // list | create | detail
+  const [view, setView] = useStateF("list");
   const [selId, setSelId] = useStateF(null);
   const [prefill, setPrefill] = useStateF(null);
   const [pickOpen, setPickOpen] = useStateF(false);
   const [menuOpen, setMenuOpen] = useStateF(false);
 
-  // filtros
   const [fTipo, setFTipo] = useStateF("todos");
   const [fEcf, setFEcf] = useStateF("todos");
-  const [fMes, setFMes] = useStateF("2026-05");
+  const [fMes, setFMes] = useStateF("todos");
   const [fPago, setFPago] = useStateF("todos");
+
+  useEffectF(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.facturas.lista({ per_page: 200 }).then((res) => {
+      const arr = (res.data ?? res).map(mapFactura);
+      if (arr.length) setFacturas(arr);
+    }).catch(() => {});
+  }, []);
 
   function updateFactura(id, patch) { setFacturas((arr) => arr.map((f) => f.id === id ? { ...f, ...patch } : f)); }
   function addFactura(f) { setFacturas((arr) => [f, ...arr]); }

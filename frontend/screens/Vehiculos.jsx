@@ -1,8 +1,8 @@
-/* global React, Icon, VEHICULOS, CUADRILLAS */
+/* global React, Icon, VEHICULOS, CUADRILLAS, KlikaData */
 // ============================================================
 //  Pantalla · Vehículos / flota
 // ============================================================
-const { useState: useStateVe } = React;
+const { useState: useStateVe, useEffect: useEffectVe } = React;
 const VE_ESTADO = {
   activo: { label: "Activo", cls: "badge-green" },
   taller: { label: "En taller", cls: "badge-amber" },
@@ -12,6 +12,7 @@ const VE_TIPOS = ["Camioneta", "Camión", "Furgoneta", "Motocicleta", "Otro"];
 
 function Vehiculos({ role }) {
   const [veh, setVeh] = useStateVe(VEHICULOS);
+  const [cuadrillas, setCuadrillas] = useStateVe(CUADRILLAS);
   const [asigns, setAsigns] = useStateVe(() => {
     const m = {};
     CUADRILLAS.forEach((c) => { if (c.vehiculo) m[c.vehiculo] = c.id; });
@@ -23,27 +24,58 @@ function Vehiculos({ role }) {
   const [form, setForm] = useStateVe(vacio);
   const esDueno = role === "dueno";
 
-  const crewDe = (vId) => CUADRILLAS.find((c) => c.id === asigns[vId]);
+  useEffectVe(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.vehiculos.lista().then((res) => {
+      const arr = (res.data ?? res).map((v) => ({ id: v.id, placa: v.placa ?? "", tipo: v.tipo ?? "Camioneta", modelo: v.modelo ?? "", estado: v.estado ?? "activo" }));
+      if (arr.length) setVeh(arr);
+    }).catch(() => {});
+    KlikaData.cuadrillas.lista().then((res) => {
+      const arr = (res.data ?? res);
+      if (arr.length) {
+        setCuadrillas(arr);
+        const m = {};
+        arr.forEach((c) => { if (c.vehiculo_id) m[c.vehiculo_id] = c.id; });
+        setAsigns(m);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const crewDe = (vId) => cuadrillas.find((c) => c.id === asigns[vId]);
 
   function abrirCrear() { setEditId(null); setForm(vacio()); setModal(true); }
   function abrirEditar(v) { setEditId(v.id); setForm({ placa: v.placa, tipo: v.tipo, modelo: v.modelo, estado: v.estado }); setModal(true); }
-  function guardar() {
+
+  async function guardar() {
     if (!form.placa.trim()) return;
-    if (editId) setVeh((arr) => arr.map((v) => v.id === editId ? { ...v, ...form } : v));
-    else {
-      const id = "V-" + String(veh.length + 1).padStart(2, "0");
-      setVeh((arr) => [...arr, { id, ...form, placa: form.placa.trim().toUpperCase() }]);
+    const payload = { placa: form.placa.trim().toUpperCase(), tipo: form.tipo, modelo: form.modelo, estado: form.estado };
+    if (editId) {
+      setVeh((arr) => arr.map((v) => v.id === editId ? { ...v, ...form } : v));
+      if (window.KlikaData && KlikaData.conectado()) KlikaData.vehiculos.actualizar(editId, payload).catch(() => {});
+    } else {
+      const tempId = "V-" + String(veh.length + 1).padStart(2, "0");
+      setVeh((arr) => [...arr, { id: tempId, ...payload }]);
+      if (window.KlikaData && KlikaData.conectado()) {
+        try {
+          const raw = await KlikaData.vehiculos.crear(payload);
+          const created = raw.data ?? raw;
+          setVeh((arr) => arr.map((v) => v.id === tempId ? { id: created.id, placa: created.placa, tipo: created.tipo, modelo: created.modelo, estado: created.estado } : v));
+        } catch (e) { console.error("guardar vehiculo", e); }
+      }
     }
     setModal(false);
   }
+
   function asignar(vId, crewId) {
     setAsigns((m) => {
       const next = { ...m };
-      // un vehículo por cuadrilla: quitar este vehículo de cualquier crew y liberar la crew elegida
       Object.keys(next).forEach((k) => { if (next[k] === crewId) delete next[k]; });
       if (crewId) next[vId] = crewId; else delete next[vId];
       return next;
     });
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.vehiculos.asignar(vId, crewId || null).catch(() => {});
+    }
   }
 
   return (

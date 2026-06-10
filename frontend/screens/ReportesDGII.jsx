@@ -1,8 +1,8 @@
-/* global React, Icon, FACTURAS, GASTOS, TIPO_NCF, facturaCalc, money, money0 */
+/* global React, Icon, FACTURAS, GASTOS, TIPO_NCF, facturaCalc, money, money0, KlikaData */
 // ============================================================
 //  CONTABILIDAD · Reportes DGII (606 compras · 607 ventas)
 // ============================================================
-const { useState: useStateR } = React;
+const { useState: useStateR, useEffect: useEffectR } = React;
 
 const PERIODOS = [
   { v: "2026-05", label: "Mayo 2026" },
@@ -10,37 +10,57 @@ const PERIODOS = [
   { v: "2026-06", label: "Junio 2026" },
 ];
 
+function map607(f) {
+  return {
+    rnc: f.rnc_cedula ?? f.rnc ?? "Consumidor final",
+    ncf: f.ncf ?? "—", tipo: f.tipo_ncf ?? f.tipo ?? "B01",
+    fecha: (f.fecha ?? "").slice(0, 10),
+    base: Number(f.subtotal ?? f.base ?? 0),
+    itbis: Number(f.itbis ?? 0),
+    total: Number(f.total ?? 0),
+  };
+}
+function map606(g) {
+  return {
+    rnc: g.rnc_proveedor ?? g.rncProv ?? "Sin RNC",
+    ncf: g.ncf_proveedor ?? g.ncfProv ?? "—",
+    tipo: g.tipo_ncf ?? g.tipoNcf ?? "B01",
+    fecha: (g.fecha ?? "").slice(0, 10),
+    proveedor: g.proveedor ?? "",
+    base: Number(g.monto ?? 0) - Number(g.itbis ?? 0),
+    itbis: Number(g.itbis ?? 0),
+    total: Number(g.monto ?? 0),
+  };
+}
+
 function ReportesDGII({ role }) {
   const [tab, setTab] = useStateR("607");
   const [periodo, setPeriodo] = useStateR("2026-05");
+  const [ventas, setVentas] = useStateR(null);
+  const [compras, setCompras] = useStateR(null);
 
-  const facturas = window.FACTURAS.filter((f) => (f.fechaISO || "").slice(0, 7) === periodo && !f.anulada && f.ncf);
-  const gastos = window.GASTOS.filter((g) => (g.fechaISO || "").slice(0, 7) === periodo);
+  useEffectR(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.reportes.r607(periodo).then((res) => {
+      const arr = res.data ?? res;
+      setVentas(Array.isArray(arr) ? arr.map(map607) : arr);
+    }).catch(() => {});
+    KlikaData.reportes.r606(periodo).then((res) => {
+      const arr = res.data ?? res;
+      setCompras(Array.isArray(arr) ? arr.map(map606) : arr);
+    }).catch(() => {});
+  }, [periodo]);
 
-  // 607 — ventas
-  const ventas = facturas.map((f) => {
-    const c = facturaCalc(f);
-    return { rnc: f.rnc || "Consumidor final", tipoId: f.rnc ? "RNC" : "—", ncf: f.ncf, tipo: f.tipo, fecha: f.fecha, base: c.base, itbis: c.itbis, total: c.total };
-  });
-  const v607 = {
-    base: ventas.reduce((a, r) => a + r.base, 0),
-    itbis: ventas.reduce((a, r) => a + r.itbis, 0),
-    total: ventas.reduce((a, r) => a + r.total, 0),
-    n: ventas.length,
-  };
+  const ventasArr = ventas ?? window.FACTURAS.filter((f) => (f.fechaISO || "").slice(0, 7) === periodo && !f.anulada && f.ncf).map((f) => { const c = facturaCalc(f); return { rnc: f.rnc || "Consumidor final", ncf: f.ncf, tipo: f.tipo, fecha: f.fecha, base: c.base, itbis: c.itbis, total: c.total }; });
+  const comprasArr = compras ?? window.GASTOS.filter((g) => (g.fechaISO || "").slice(0, 7) === periodo).map((g) => ({ rnc: g.rncProv || "Sin RNC", ncf: g.ncfProv || "—", tipo: g.tipoNcf, fecha: g.fecha, proveedor: g.proveedor, base: g.monto - g.itbis, itbis: g.itbis, total: g.monto }));
 
-  // 606 — compras
-  const compras = gastos.map((g) => ({ rnc: g.rncProv || "Sin RNC", ncf: g.ncfProv || "—", tipo: g.tipoNcf, fecha: g.fecha, proveedor: g.proveedor, base: g.monto - g.itbis, itbis: g.itbis, total: g.monto }));
-  const c606 = {
-    base: compras.reduce((a, r) => a + r.base, 0),
-    itbis: compras.reduce((a, r) => a + r.itbis, 0),
-    total: compras.reduce((a, r) => a + r.total, 0),
-    n: compras.length,
-  };
+  const v607 = { base: ventasArr.reduce((a, r) => a + (r.base ?? 0), 0), itbis: ventasArr.reduce((a, r) => a + (r.itbis ?? 0), 0), total: ventasArr.reduce((a, r) => a + (r.total ?? 0), 0), n: ventasArr.length };
+  const c606 = { base: comprasArr.reduce((a, r) => a + (r.base ?? 0), 0), itbis: comprasArr.reduce((a, r) => a + (r.itbis ?? 0), 0), total: comprasArr.reduce((a, r) => a + (r.total ?? 0), 0), n: comprasArr.length };
 
   const itbisXpagar = v607.itbis - c606.itbis;
-  const data = tab === "607" ? ventas : compras;
+  const data = tab === "607" ? ventasArr : comprasArr;
   const sum = tab === "607" ? v607 : c606;
+  const txtUrl = tab === "607" ? KlikaData.reportes.txt607(periodo) : KlikaData.reportes.txt606(periodo);
 
   return (
     <div style={rpd.page} className="r-page">
@@ -57,7 +77,7 @@ function ReportesDGII({ role }) {
         <select className="input input-sm" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ width: "auto", minWidth: 160 }}>
           {PERIODOS.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
         </select>
-        <button className="btn btn-ghost" style={{ marginLeft: "auto" }}><Icon name="download" size={16} /> Descargar .txt</button>
+        <a href={window.KlikaData && KlikaData.conectado() ? txtUrl : "#"} download className="btn btn-ghost" style={{ marginLeft: "auto" }}><Icon name="download" size={16} /> Descargar .txt</a>
       </div>
 
       {/* Resumen */}

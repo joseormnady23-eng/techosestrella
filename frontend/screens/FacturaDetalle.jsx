@@ -1,4 +1,4 @@
-/* global React, Icon, TIPO_NCF, ECF_META, METODOS_PAGO, OBRAS, facturaCalc, facturaPagada, money, money0 */
+/* global React, Icon, TIPO_NCF, ECF_META, METODOS_PAGO, OBRAS, facturaCalc, facturaPagada, money, money0, KlikaData */
 // ============================================================
 //  CONTABILIDAD · Detalle de factura
 //  estado DGII · items · pagos · cobro · anular · XML
@@ -14,9 +14,26 @@ function FacturaDetalle({ factura: f, role, onBack, onUpdate }) {
   const cobroPct = c.total > 0 ? Math.min(100, (c.cobrado / c.total) * 100) : 0;
   const obra = f.obraId ? window.OBRAS.find((o) => o.id === f.obraId) : null;
 
-  function registrarPago(p) { onUpdate({ pagos: [...(f.pagos || []), p] }); setPagoOpen(false); }
-  function anular(motivo) { onUpdate({ anulada: true, motivoAnulacion: motivo }); setAnularOpen(false); }
-  function reintentar() { onUpdate({ ecf: "pendiente", motivoRechazo: null }); }
+  async function registrarPago(p) {
+    onUpdate({ pagos: [...(f.pagos || []), p] });
+    setPagoOpen(false);
+    if (window.KlikaData && KlikaData.conectado() && f.id) {
+      KlikaData.facturas.pagar(f.id, { monto: p.monto, metodo: p.metodo, nota: p.nota || null }).catch(() => {});
+    }
+  }
+  async function anular(motivo) {
+    onUpdate({ anulada: true, motivoAnulacion: motivo });
+    setAnularOpen(false);
+    if (window.KlikaData && KlikaData.conectado() && f.id) {
+      KlikaData.facturas.anular(f.id).catch(() => {});
+    }
+  }
+  async function reintentar() {
+    onUpdate({ ecf: "pendiente", motivoRechazo: null });
+    if (window.KlikaData && KlikaData.conectado() && f.id) {
+      KlikaData.facturas.enviarDgii(f.id).catch(() => {});
+    }
+  }
 
   return (
     <div style={fd.page} className="r-page">
@@ -56,7 +73,7 @@ function FacturaDetalle({ factura: f, role, onBack, onUpdate }) {
 
         {/* Acciones */}
         <div style={fd.actionsBar}>
-          <button className="btn btn-ghost btn-sm"><Icon name="download" size={16} /> Descargar PDF</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { if (f.id && window.KlikaData) window.open(KlikaData.facturas.pdf(f.id)); }}><Icon name="download" size={16} /> Descargar PDF</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setXmlOpen(true)}><Icon name="quote" size={15} /> Ver XML</button>
           {!f.anulada && <button className="btn btn-sm" style={{ background: "var(--red-bg)", color: "var(--red-ink)" }} onClick={() => setAnularOpen(true)}><Icon name="x" size={15} /> Anular factura</button>}
         </div>

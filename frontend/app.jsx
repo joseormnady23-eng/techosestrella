@@ -85,14 +85,14 @@ function App() {
     );
   }
 
-  const obra = OBRAS.find((o) => o.id === obraId);
+  const obra = OBRAS.find((o) => o.id === obraId || o._id == obraId) || null;
   const [tTitle, tSub] = TITLES[screen] || ["", ""];
 
   let content;
   switch (screen) {
     case "dashboard":   content = <Dashboard onNav={nav} onKlika={() => setKlikaOpen(true)} role={role} />; break;
     case "obras":       content = <ObrasList onNav={nav} role={role} />; break;
-    case "obra":        content = <ObraDetalle obra={obra} tab={obraTab} setTab={setObraTab} onNav={nav} role={role} onPortal={() => setPortalOpen(true)} />; break;
+    case "obra":        content = <ObraDetalle obra={obra} obraId={obraId} tab={obraTab} setTab={setObraTab} onNav={nav} role={role} onPortal={() => setPortalOpen(true)} />; break;
     case "cotizacion":  content = <Cotizacion onNav={nav} role={role} onPortal={() => setPortalOpen(true)} />; break;
     case "facturas":    content = <Facturas role={role} />; break;
     case "gastos":      content = <Gastos role={role} />; break;
@@ -112,7 +112,7 @@ function App() {
   }
 
   // título dinámico para detalle de obra
-  const headTitle = screen === "obra" && obra ? obra.titulo : tTitle;
+  const headTitle = screen === "obra" && obra ? obra.titulo : (screen === "obra" && obraId ? "Cargando obra…" : tTitle);
   const headSub = screen === "obra" && obra ? `${obra.id} · ${obra.clienteNom}` : tSub;
 
   const actions = null;

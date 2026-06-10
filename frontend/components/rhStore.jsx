@@ -102,12 +102,36 @@ const AUSENCIAS_SEED = [
   { id: "AU-311", empId: "U-4", tipo: "permiso", ini: "2026-05-12", fin: "2026-05-12", motivo: "Asunto familiar", estado: "rechazada", motivoRechazo: "La obra estaba en fase crítica esa semana.", solicitada: "08 may" },
 ];
 
+const COLORS_POOL = ["#1E7FC2", "#7B4FA0", "#3FAE4A", "#F2A33A", "#176399", "#C2528B", "#2A9D8F", "#E0392B", "#6B7280"];
+
 const RHStore = (function () {
   const listeners = new Set();
   function emit() { listeners.forEach((fn) => fn()); }
   const empleados = EMPLEADOS.map((e) => ({ ...e }));
   const ausencias = AUSENCIAS_SEED.map((a) => ({ ...a }));
   let seq = 313;
+  let _inicializado = false;
+
+  function mapEmp(u, idx) {
+    return {
+      id: u.id, nombre: u.nombre ?? "", rol: u.rol ?? "aplicador",
+      cargo: u.cargo ?? "", ingreso: u.fecha_ingreso ?? u.ingreso ?? "",
+      salario: Number(u.salario ?? 0), contrato: u.tipo_contrato ?? u.contrato ?? "Indefinido",
+      cuadrilla: u.cuadrilla_id ?? null,
+      color: u.color ?? COLORS_POOL[idx % COLORS_POOL.length], activo: u.activo !== false,
+    };
+  }
+  function mapAus(a) {
+    return {
+      id: a.id, empId: a.usuario_id ?? a.empId,
+      tipo: a.tipo ?? "otro",
+      ini: (a.fecha_inicio ?? a.ini ?? "").slice(0, 10),
+      fin: (a.fecha_fin ?? a.fin ?? "").slice(0, 10),
+      motivo: a.motivo ?? "", estado: a.estado ?? "pendiente",
+      motivoRechazo: a.motivo_rechazo ?? a.motivoRechazo ?? null,
+      solicitada: (a.created_at ?? a.solicitada ?? "").slice(0, 10),
+    };
+  }
 
   function emp(id) { return empleados.find((e) => e.id === id); }
 
@@ -174,12 +198,56 @@ const RHStore = (function () {
     },
 
     crearAusencia({ empId, tipo, ini, fin, motivo }) {
-      ausencias.unshift({ id: "AU-" + seq++, empId, tipo, ini, fin, motivo: motivo || "", estado: "pendiente", solicitada: "hoy" });
+      const tempId = "AU-" + seq++;
+      ausencias.unshift({ id: tempId, empId, tipo, ini, fin, motivo: motivo || "", estado: "pendiente", solicitada: "hoy" });
       emit();
+      if (window.KlikaData && KlikaData.conectado()) {
+        KlikaData.ausencias.crear({ usuario_id: empId, tipo, fecha_inicio: ini, fecha_fin: fin, motivo: motivo || null })
+          .then((res) => {
+            const created = mapAus(res.data ?? res);
+            const a = ausencias.find((x) => x.id === tempId);
+            if (a) { a.id = created.id; emit(); }
+          }).catch(() => {});
+      }
     },
-    aprobar(id) { const a = ausencias.find((x) => x.id === id); if (a) { a.estado = "aprobada"; emit(); } },
-    rechazar(id, motivoRechazo) { const a = ausencias.find((x) => x.id === id); if (a) { a.estado = "rechazada"; a.motivoRechazo = motivoRechazo; emit(); } },
-    editarEmpleado(id, campos) { const e = emp(id); if (e) { Object.assign(e, campos); emit(); } },
+    aprobar(id) {
+      const a = ausencias.find((x) => x.id === id);
+      if (a) { a.estado = "aprobada"; emit(); }
+      if (window.KlikaData && KlikaData.conectado()) KlikaData.ausencias.aprobar(id).catch(() => {});
+    },
+    rechazar(id, motivoRechazo) {
+      const a = ausencias.find((x) => x.id === id);
+      if (a) { a.estado = "rechazada"; a.motivoRechazo = motivoRechazo; emit(); }
+      if (window.KlikaData && KlikaData.conectado()) KlikaData.ausencias.rechazar(id, motivoRechazo).catch(() => {});
+    },
+    editarEmpleado(id, campos) {
+      const e = emp(id);
+      if (e) { Object.assign(e, campos); emit(); }
+      if (window.KlikaData && KlikaData.conectado()) {
+        const payload = {};
+        if (campos.cargo) payload.cargo = campos.cargo;
+        if (campos.salario) payload.salario = campos.salario;
+        if (campos.contrato) payload.tipo_contrato = campos.contrato;
+        if (campos.ingreso) payload.fecha_ingreso = campos.ingreso;
+        KlikaData.empleados.actualizar(id, payload).catch(() => {});
+      }
+    },
+
+    async inicializar() {
+      if (_inicializado || !window.KlikaData || !KlikaData.conectado()) return;
+      _inicializado = true;
+      try {
+        const [empRes, ausRes] = await Promise.all([
+          KlikaData.empleados.lista(),
+          KlikaData.ausencias.lista({ per_page: 300 }),
+        ]);
+        const emps = (empRes.data ?? empRes).map((u, i) => mapEmp(u, i));
+        const auss = (ausRes.data ?? ausRes).map(mapAus);
+        if (emps.length) { empleados.splice(0, empleados.length, ...emps); }
+        if (auss.length) { ausencias.splice(0, ausencias.length, ...auss); }
+        emit();
+      } catch (e) { _inicializado = false; }
+    },
   };
 })();
 

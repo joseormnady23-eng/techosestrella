@@ -3,12 +3,14 @@
 //  Pantalla · Recursos Humanos
 //  Tabs: Empleados · Calendario de ausencias · Aprobaciones
 // ============================================================
-const { useState: useStateRH } = React;
+const { useState: useStateRH, useEffect: useEffectRH } = React;
 
 function RecursosHumanos({ role }) {
   const store = useRHStore();
   const esGestor = role === "dueno" || role === "secretaria";
   const [tab, setTab] = useStateRH("empleados");
+
+  useEffectRH(() => { store.inicializar(); }, []);
   const [perfil, setPerfil] = useStateRH(null);     // empId del perfil abierto
   const [editar, setEditar] = useStateRH(null);     // empId a editar
   const [solicitar, setSolicitar] = useStateRH(false);

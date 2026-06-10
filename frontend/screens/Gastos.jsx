@@ -1,19 +1,54 @@
-/* global React, Icon, GASTOS, GASTO_CAT, TIPO_NCF, METODOS_PAGO, OBRAS, money, money0 */
+/* global React, Icon, GASTOS, GASTO_CAT, TIPO_NCF, METODOS_PAGO, OBRAS, money, money0, KlikaData */
 // ============================================================
 //  CONTABILIDAD · Gastos (compras / 606)
 // ============================================================
-const { useState: useStateG } = React;
+const { useState: useStateG, useEffect: useEffectG } = React;
+
+function mapGasto(g) {
+  return {
+    id: g.id, fecha: (g.fecha ?? "").slice(0, 10), fechaISO: g.fecha ?? "",
+    proveedor: g.proveedor ?? "", rncProv: g.rnc_proveedor ?? "",
+    descripcion: g.descripcion ?? "", categoria: g.categoria ?? "Otros",
+    monto: Number(g.monto ?? 0), itbis: Number(g.itbis ?? 0),
+    ncfProv: g.ncf_proveedor ?? null, tipoNcf: g.tipo_ncf ?? "B01",
+    metodo: g.metodo_pago ?? "efectivo", obraId: g.obra_id ?? null,
+  };
+}
 
 function Gastos({ role }) {
   const [gastos, setGastos] = useStateG(() => window.GASTOS.map((g) => ({ ...g })));
   const [open, setOpen] = useStateG(false);
   const [fCat, setFCat] = useStateG("todas");
 
+  useEffectG(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.gastosContables.lista({ per_page: 200 }).then((res) => {
+      const arr = (res.data ?? res).map(mapGasto);
+      if (arr.length) setGastos(arr);
+    }).catch(() => {});
+  }, []);
+
   const visibles = gastos.filter((g) => fCat === "todas" || g.categoria === fCat);
   const totMonto = visibles.reduce((a, g) => a + g.monto, 0);
-  const totItbis = visibles.reduce((a, g) => a + g.itbis, 0);
+  const totItbis = visibles.reduce((a, g) => a + (g.itbis || 0), 0);
 
-  function addGasto(g) { setGastos((arr) => [g, ...arr]); setOpen(false); }
+  async function addGasto(g) {
+    setGastos((arr) => [g, ...arr]);
+    setOpen(false);
+    if (window.KlikaData && KlikaData.conectado()) {
+      try {
+        const raw = await KlikaData.gastosContables.crear({
+          proveedor: g.proveedor, rnc_proveedor: g.rncProv || null,
+          descripcion: g.descripcion, categoria: g.categoria,
+          monto: g.monto, itbis: g.itbis || 0,
+          ncf_proveedor: g.ncfProv || null, tipo_ncf: g.tipoNcf || null,
+          metodo_pago: g.metodo, obra_id: g.obraId || null,
+        });
+        const created = mapGasto(raw.data ?? raw);
+        setGastos((arr) => arr.map((x) => x.id === g.id ? created : x));
+      } catch (e) { console.error("addGasto", e); }
+    }
+  }
 
   return (
     <div style={gs.page} className="r-page">

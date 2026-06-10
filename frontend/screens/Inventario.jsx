@@ -1,4 +1,4 @@
-/* global React, Icon, MATERIALES, money0, useKlikaStore, BarcodeSVG, imprimirEtiqueta, ROLES */
+/* global React, Icon, MATERIALES, money0, useKlikaStore, BarcodeSVG, imprimirEtiqueta, ROLES, KlikaData */
 // ============================================================
 //  Pantalla 7 · Inventario
 //  + Códigos de barra  + Aprobaciones de cambios sensibles
@@ -15,12 +15,30 @@ const MOVIMIENTOS = [
 
 function Inventario({ role }) {
   const store = useKlikaStore();
-  const mats = store.materiales;
   const CAMPOS = store.CAMPOS_SENSIBLES;
   const esDueno = role === "dueno";
   const nombreUsuario = (ROLES[role] && ROLES[role].nombre) || "Usuario";
 
   const [vista, setVista] = useStateInv(() => store.consumirFocoSolicitudes() ? "solicitudes" : "inventario");
+
+  useEffectInv(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.materiales.lista({ per_page: 200 }).then((res) => {
+      const arr = (res.data ?? res).map(KlikaData.map.material);
+      store.cargarMateriales(arr);
+    }).catch(() => {});
+    KlikaData.movimientos.lista({ per_page: 50 }).then((res) => {
+      const arr = (res.data ?? res).map((m) => ({
+        id: m.id, fecha: (m.created_at ?? "").slice(0, 10),
+        tipo: m.tipo ?? "entrada", mat: m.material?.nombre ?? "—",
+        cant: Number(m.cantidad ?? 0), obra: m.referencia ?? "—",
+        quien: m.usuario?.nombre ?? "—",
+      }));
+      if (arr.length) setMovs(arr);
+    }).catch(() => {});
+  }, []);
+
+  const mats = store.materiales;
   const [cat, setCat] = useStateInv("todas");
   const [estado, setEstado] = useStateInv("todos"); // todos | bajo | ok
   const [modal, setModal] = useStateInv(false);
@@ -45,20 +63,32 @@ function Inventario({ role }) {
 
   function setFieldDirecto(id, key, val) { store.setCampoDirecto(id, key, val); }
 
-  function guardarProducto() {
+  async function guardarProducto() {
     if (!nuevo.nombre.trim()) return;
-    const id = "M-" + String(mats.length + 1).padStart(2, "0");
-    store.agregarMaterial({
-      id, nombre: nuevo.nombre.trim(), cat: nuevo.cat.trim() || "Sin categoría",
+    const localId = "M-" + String(mats.length + 1).padStart(2, "0");
+    const mat = {
+      id: localId, nombre: nuevo.nombre.trim(), cat: nuevo.cat.trim() || "Sin categoría",
       unidad: nuevo.unidad.trim() || "unidad", rend: +nuevo.rend || 0,
       stock: +nuevo.stock || 0, min: +nuevo.min || 0, precio: +nuevo.precio || 0,
-    });
+    };
+    store.agregarMaterial(mat);
     setNuevo({ nombre: "", cat: "", unidad: "", rend: "", stock: "", min: "", precio: "" });
     setProdModal(false);
     flash("Producto agregado al inventario", "ok");
+    if (window.KlikaData && KlikaData.conectado()) {
+      try {
+        const raw = await KlikaData.materiales.crear({
+          nombre: mat.nombre, categoria: mat.cat, unidad: mat.unidad,
+          rendimiento: mat.rend || null, stock_actual: mat.stock,
+          stock_minimo: mat.min, costo_promedio: mat.precio,
+        });
+        const nuevo2 = KlikaData.map.material(raw.data ?? raw);
+        store.reemplazarMaterial(localId, nuevo2);
+      } catch (e) { console.error("guardarProducto", e); }
+    }
   }
 
-  function guardarMovimiento() {
+  async function guardarMovimiento() {
     const material = mats.find((m) => m.id === mov.matId);
     const cantNum = Math.abs(+mov.cant) || 0;
     if (!material || !cantNum) return;
@@ -69,10 +99,18 @@ function Inventario({ role }) {
       obra: mov.ref || (movTipo === "entrada" ? "Compra" : movTipo === "ajuste" ? "Ajuste" : "Salida"),
       quien: nombreUsuario,
     }, ...arr]);
-    setMov({ matId: mats[0].id, cant: "", ref: "", nota: "" });
+    setMov({ matId: mats[0]?.id || "", cant: "", ref: "", nota: "" });
     setScanFeed("");
     setModal(false);
     flash("Movimiento registrado", "ok");
+    if (window.KlikaData && KlikaData.conectado() && material._id) {
+      try {
+        await KlikaData.movimientos.crear({
+          material_id: material._id, tipo: movTipo,
+          cantidad: delta, referencia: mov.ref || null, notas: mov.nota || null,
+        });
+      } catch (e) { console.error("guardarMovimiento", e); }
+    }
   }
 
   // Búsqueda por código en el formulario de movimiento

@@ -1,37 +1,70 @@
-/* global React, Icon, CUADRILLAS, VEHICULOS, OBRAS, ESTADOS */
+/* global React, Icon, CUADRILLAS, VEHICULOS, OBRAS, ESTADOS, KlikaData */
 // ============================================================
 //  Pantalla 8 · Cuadrillas
 // ============================================================
-const { useState: useStateCr } = React;
+const { useState: useStateCr, useEffect: useEffectCr } = React;
 const CREW_COLORS = ["var(--star-blue)", "var(--star-green)", "var(--star-purple)", "var(--star-red)", "var(--amber)"];
+
+function mapCuadrilla(c) {
+  return {
+    id: c.id, nombre: c.nombre ?? "", lider: c.lider?.nombre ?? c.lider ?? "",
+    color: CREW_COLORS[(c.id - 1) % CREW_COLORS.length] ?? "var(--star-blue)",
+    miembros: (c.miembros ?? []).map((m) => m.nombre ?? m),
+    obras: (c.obras ?? []).map((o) => o.codigo ?? String(o.id)),
+    vehiculo: c.vehiculo_id ?? null,
+  };
+}
 
 function Cuadrillas({ onNav, role }) {
   const [crews, setCrews] = useStateCr(CUADRILLAS);
   const [crewModal, setCrewModal] = useStateCr(false);
   const [form, setForm] = useStateCr({ nombre: "", lider: "" });
-  const [addTo, setAddTo] = useStateCr(null); // crew id receiving a new member
+  const [addTo, setAddTo] = useStateCr(null);
   const [memberName, setMemberName] = useStateCr("");
 
-  function crearCuadrilla() {
+  useEffectCr(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.cuadrillas.lista().then((res) => {
+      const arr = (res.data ?? res).map(mapCuadrilla);
+      if (arr.length) setCrews(arr);
+    }).catch(() => {});
+  }, []);
+
+  async function crearCuadrilla() {
     if (!form.nombre.trim() || !form.lider.trim()) return;
-    const n = crews.length + 1;
-    const id = "CU-" + n;
-    setCrews((arr) => [...arr, {
-      id, nombre: form.nombre.trim(), lider: form.lider.trim(),
-      color: CREW_COLORS[(n - 1) % CREW_COLORS.length],
+    const tempId = "CU-" + (crews.length + 1);
+    const nueva = {
+      id: tempId, nombre: form.nombre.trim(), lider: form.lider.trim(),
+      color: CREW_COLORS[crews.length % CREW_COLORS.length],
       miembros: [form.lider.trim()], obras: [],
-    }]);
+    };
+    setCrews((arr) => [...arr, nueva]);
     setForm({ nombre: "", lider: "" });
     setCrewModal(false);
+    if (window.KlikaData && KlikaData.conectado()) {
+      try {
+        const raw = await KlikaData.cuadrillas.crear({ nombre: form.nombre.trim(), lider: form.lider.trim() });
+        const creada = mapCuadrilla(raw.data ?? raw);
+        setCrews((arr) => arr.map((c) => c.id === tempId ? creada : c));
+      } catch (e) { console.error("crearCuadrilla", e); }
+    }
   }
-  function agregarMiembro(crewId) {
+
+  async function agregarMiembro(crewId) {
     if (!memberName.trim()) return;
     setCrews((arr) => arr.map((c) => c.id === crewId ? { ...c, miembros: [...c.miembros, memberName.trim()] } : c));
     setMemberName("");
     setAddTo(null);
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.cuadrillas.agregarMiembro(crewId, memberName.trim()).catch(() => {});
+    }
   }
+
   function quitarMiembro(crewId, nombre) {
     setCrews((arr) => arr.map((c) => c.id === crewId ? { ...c, miembros: c.miembros.filter((m) => m !== nombre) } : c));
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.cuadrillas.quitarMiembro(crewId, nombre).catch(() => {});
+    }
   }
 
   return (

@@ -1,42 +1,77 @@
-/* global React, Icon, CLIENTES, OBRAS, ESTADOS, money0 */
+/* global React, Icon, CLIENTES, OBRAS, ESTADOS, money0, KlikaData */
 // ============================================================
 //  Pantalla 9 · Clientes (CRM)
 // ============================================================
-const { useState: useStateCl } = React;
+const { useState: useStateCl, useEffect: useEffectCl } = React;
 
 function Clientes({ onNav, role }) {
-  const [clientes, setClientes] = useStateCl(() => CLIENTES.map((c) => ({
+  const mockInit = () => CLIENTES.map((c) => ({
     activo: true, tipoPersona: "Persona", telAlt: "", direccion: c.sector, ciudad: "", rnc: "", notas: "", ...c,
-  })));
+  }));
+  const [clientes, setClientes] = useStateCl(mockInit);
   const [sel, setSel] = useStateCl(CLIENTES[0].id);
   const [q, setQ] = useStateCl("");
   const [modal, setModal] = useStateCl(false);
-  const [editId, setEditId] = useStateCl(null); // null = crear
+  const [guardando, setGuardando] = useStateCl(false);
+  const [editId, setEditId] = useStateCl(null);
   const formVacio = () => ({ nombre: "", contacto: "", tipoPersona: "Persona", tipo: "Residencial", tel: "", telAlt: "", correo: "", direccion: "", ciudad: "", sector: "", rnc: "", notas: "" });
   const [form, setForm] = useStateCl(formVacio);
-  const cliente = clientes.find((c) => c.id === sel);
-  const lista = clientes.filter((c) => (c.nombre + c.contacto + (c.sector || "")).toLowerCase().includes(q.toLowerCase()));
-  const obrasCli = OBRAS.filter((o) => o.cliente === sel);
   const tipoColor = { Residencial: "badge-blue", Comercial: "badge-purple", Institucional: "badge-amber" };
+
+  useEffectCl(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.clientes.lista().then((res) => {
+      const arr = (res.data ?? res).map(KlikaData.map.cliente);
+      setClientes(arr);
+      if (arr.length) setSel(arr[0].id);
+    }).catch(() => {});
+  }, []);
+
+  const lista = clientes.filter((c) => (c.nombre + c.contacto + (c.sector || "")).toLowerCase().includes(q.toLowerCase()));
+  const cliente = clientes.find((c) => c.id === sel) || clientes[0];
+  const obrasCli = OBRAS.filter((o) => o.cliente === (cliente?._id ?? sel) || o.cliente === sel);
 
   function abrirCrear() { setEditId(null); setForm(formVacio()); setModal(true); }
   function abrirEditar(c) {
     setEditId(c.id);
-    setForm({ nombre: c.nombre, contacto: c.contacto, tipoPersona: c.tipoPersona || "Persona", tipo: c.tipo, tel: c.tel, telAlt: c.telAlt || "", correo: c.correo, direccion: c.direccion || "", ciudad: c.ciudad || "", sector: c.sector || "", rnc: c.rnc || "", notas: c.notas || "" });
+    setForm({ nombre: c.nombre, contacto: c.contacto, tipoPersona: c.tipoPersona || "Persona", tipo: c.tipo || "Residencial", tel: c.tel, telAlt: c.telAlt || "", correo: c.correo, direccion: c.direccion || "", ciudad: c.ciudad || "", sector: c.sector || "", rnc: c.rnc || "", notas: c.notas || "" });
     setModal(true);
   }
-  function guardar() {
+
+  async function guardar() {
     if (!form.nombre.trim()) return;
-    if (editId) {
-      setClientes((arr) => arr.map((c) => c.id === editId ? { ...c, ...form } : c));
-    } else {
-      const id = "C-" + (Math.max(...clientes.map((c) => +c.id.split("-")[1])) + 1);
-      setClientes((arr) => [...arr, { id, activo: true, desde: "2026", obras: 0, ...form, sector: form.sector || form.ciudad }]);
-      setSel(id);
-    }
+    setGuardando(true);
+    try {
+      const payload = KlikaData.map.clienteAEnvio(form);
+      if (editId && window.KlikaData && KlikaData.conectado()) {
+        const raw = await KlikaData.clientes.actualizar(editId, payload);
+        const actualizado = KlikaData.map.cliente(raw.data ?? raw);
+        setClientes((arr) => arr.map((c) => c.id === editId ? { ...c, ...actualizado } : c));
+      } else if (!editId && window.KlikaData && KlikaData.conectado()) {
+        const raw = await KlikaData.clientes.crear(payload);
+        const nuevo = KlikaData.map.cliente(raw.data ?? raw);
+        setClientes((arr) => [...arr, nuevo]);
+        setSel(nuevo.id);
+      } else if (editId) {
+        setClientes((arr) => arr.map((c) => c.id === editId ? { ...c, ...form } : c));
+      } else {
+        const id = "C-" + (Math.max(0, ...clientes.map((c) => +String(c.id).split("-")[1])) + 1);
+        setClientes((arr) => [...arr, { id, activo: true, desde: "2026", obras: 0, ...form, sector: form.sector || form.ciudad }]);
+        setSel(id);
+      }
+    } catch (e) { console.error("guardar cliente", e); } finally { setGuardando(false); }
     setModal(false);
   }
-  function toggleActivo(c) { setClientes((arr) => arr.map((x) => x.id === c.id ? { ...x, activo: !x.activo } : x)); }
+
+  async function toggleActivo(c) {
+    try {
+      if (window.KlikaData && KlikaData.conectado()) {
+        if (c.activo) { await KlikaData.clientes.desactivar(c.id); }
+        else { await KlikaData.clientes.reactivar(c.id); }
+      }
+      setClientes((arr) => arr.map((x) => x.id === c.id ? { ...x, activo: !x.activo } : x));
+    } catch (e) { console.error("toggleActivo", e); }
+  }
 
   return (
     <div style={cl.page} className="r-page r-main">

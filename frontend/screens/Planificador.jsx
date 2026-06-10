@@ -1,17 +1,51 @@
-/* global React, Icon, CLIMA, CLIMA_META, PROGRAMACION, OBRAS, CUADRILLAS, ESTADOS */
+/* global React, Icon, CLIMA, CLIMA_META, PROGRAMACION, OBRAS, CUADRILLAS, ESTADOS, KlikaData */
 // ============================================================
 //  Pantalla 6 · Planificador del mes (clima + obras)
 // ============================================================
-const { useState: useStatePl } = React;
+const { useState: useStatePl, useEffect: useEffectPl } = React;
 
 function Planificador({ onNav, onKlika, role }) {
-  const [sel, setSel] = useStatePl(11); // día seleccionado (jueves con conflicto)
+  const [sel, setSel] = useStatePl(11);
+  const [progMap, setProgMap] = useStatePl(() => ({ ...PROGRAMACION }));
+  const [climaMap, setClimaMap] = useStatePl(() => ({ ...CLIMA }));
+  const [obrasData, setObrasData] = useStatePl(() => [...OBRAS]);
+  const [cuadrillasData, setCuadrillasData] = useStatePl(() => [...CUADRILLAS]);
+
   // junio 2026 empieza lunes 1
   const dias = Array.from({ length: 30 }, (_, i) => i + 1);
   const dowHead = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-  function obrasDe(d) { return (PROGRAMACION[d] || []).map((id) => OBRAS.find((o) => o.id === id)).filter(Boolean); }
-  function conflicto(d) { return CLIMA[d] === "bloqueado" && (PROGRAMACION[d] || []).length > 0; }
+  useEffectPl(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    const mes = "2026-06";
+    KlikaData.planificador.dias(mes).then((res) => {
+      const arr = res.data ?? res;
+      if (!arr.length) return;
+      const prog = {};
+      const clim = {};
+      arr.forEach((entry) => {
+        const d = entry.fecha ? new Date(entry.fecha).getUTCDate() : null;
+        if (!d) return;
+        if (!prog[d]) prog[d] = [];
+        const obraRef = entry.obra?.codigo ?? (entry.obra_id ? String(entry.obra_id) : null);
+        if (obraRef) prog[d].push(obraRef);
+        if (entry.clima) clim[d] = entry.clima;
+      });
+      setProgMap((p) => ({ ...p, ...prog }));
+      setClimaMap((c) => ({ ...c, ...clim }));
+    }).catch(() => {});
+    KlikaData.obras.lista({ per_page: 100 }).then((res) => {
+      const arr = (res.data ?? res).map(KlikaData.map.obra);
+      if (arr.length) setObrasData(arr);
+    }).catch(() => {});
+    KlikaData.cuadrillas.lista().then((res) => {
+      const arr = res.data ?? res;
+      if (arr.length) setCuadrillasData(arr);
+    }).catch(() => {});
+  }, []);
+
+  function obrasDe(d) { return (progMap[d] || []).map((id) => obrasData.find((o) => o.id === id || o._id == id)).filter(Boolean); }
+  function conflicto(d) { return climaMap[d] === "bloqueado" && (progMap[d] || []).length > 0; }
 
   const conflictos = dias.filter(conflicto);
   const selObras = obrasDe(sel);
@@ -49,7 +83,7 @@ function Planificador({ onNav, onKlika, role }) {
           <div style={pl.dowRow}>{dowHead.map((d) => <div key={d} style={pl.dow}>{d}</div>)}</div>
           <div style={pl.grid}>
             {dias.map((d) => {
-              const m = CLIMA_META[CLIMA[d]];
+              const m = CLIMA_META[climaMap[d] ?? "soleado"] ?? CLIMA_META.soleado;
               const obs = obrasDe(d);
               const conf = conflicto(d);
               const isSel = sel === d;
@@ -63,7 +97,7 @@ function Planificador({ onNav, onKlika, role }) {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                     {obs.slice(0, 2).map((o) => {
-                      const cu = CUADRILLAS.find((c) => c.id === o.cuadrilla);
+                      const cu = cuadrillasData.find((c) => c.id === o.cuadrilla);
                       return (
                         <span key={o.id} style={{ ...pl.chipObra, background: conf ? "var(--red)" : (cu ? cu.color : "var(--ink-400)") }}>
                           {conf && <Icon name="alert" size={10} color="#fff" />}
@@ -110,12 +144,14 @@ function Planificador({ onNav, onKlika, role }) {
               <div style={{ fontSize: 12, color: "var(--ink-400)", fontWeight: 600 }}>Junio</div>
               <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }} className="tnum">{sel}</div>
             </div>
-            <span className="badge" style={{ background: CLIMA_META[CLIMA[sel]].bg, color: CLIMA_META[CLIMA[sel]].ink, height: 28 }}>
-              <Icon name={CLIMA_META[CLIMA[sel]].icon} size={14} color={CLIMA_META[CLIMA[sel]].color} /> {CLIMA_META[CLIMA[sel]].label}
-            </span>
+            {(() => { const ms = CLIMA_META[climaMap[sel] ?? "soleado"] ?? CLIMA_META.soleado; return (
+              <span className="badge" style={{ background: ms.bg, color: ms.ink, height: 28 }}>
+                <Icon name={ms.icon} size={14} color={ms.color} /> {ms.label}
+              </span>
+            ); })()}
           </div>
           {selObras.length ? selObras.map((o) => {
-            const cu = CUADRILLAS.find((c) => c.id === o.cuadrilla);
+            const cu = cuadrillasData.find((c) => c.id === o.cuadrilla);
             const conf = conflicto(sel);
             return (
               <button key={o.id} onClick={() => onNav("obra", o.id)} style={{ ...pl.dayObra, borderColor: conf ? "var(--red)" : "var(--ink-100)" }}>

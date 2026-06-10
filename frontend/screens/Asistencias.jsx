@@ -1,25 +1,63 @@
-/* global React, Icon, ASISTENCIAS, ASIST_META, CUADRILLAS, ROLES */
+/* global React, Icon, ASISTENCIAS, ASIST_META, CUADRILLAS, ROLES, KlikaData */
 // ============================================================
 //  Pantalla · Asistencias (check-ins · corrección por supervisor/dueño)
 // ============================================================
-const { useState: useStateAs } = React;
+const { useState: useStateAs, useEffect: useEffectAs } = React;
+
+function mapAsistencia(r) {
+  return {
+    id: r.id,
+    fecha: (r.fecha ?? r.created_at ?? "").slice(0, 10),
+    quien: r.usuario?.nombre ?? r.usuario_id ?? "—",
+    cuadrilla: r.cuadrilla_id ?? null,
+    obra: r.obra?.codigo ?? (r.obra_id ? String(r.obra_id) : "—"),
+    entrada: r.hora_entrada ? r.hora_entrada.slice(0, 5) : "—",
+    salida: r.hora_salida ? r.hora_salida.slice(0, 5) : "—",
+    estado: r.estado ?? "ok",
+    motivo: r.motivo_correccion ?? "",
+    corregido: r.corregido_por ? { por: r.corregido_por } : null,
+  };
+}
 
 function Asistencias({ role }) {
   const [regs, setRegs] = useStateAs(ASISTENCIAS);
+  const [cuadrillas, setCuadrillas] = useStateAs(CUADRILLAS);
   const [crew, setCrew] = useStateAs("todas");
-  const [edit, setEdit] = useStateAs(null); // registro en edición
+  const [edit, setEdit] = useStateAs(null);
   const [form, setForm] = useStateAs({ entrada: "", salida: "", estado: "ok", motivo: "" });
   const puedeCorregir = role === "dueno" || role === "supervisor";
 
+  useEffectAs(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.asistencias.lista({ per_page: 200 }).then((res) => {
+      const arr = (res.data ?? res).map(mapAsistencia);
+      if (arr.length) setRegs(arr);
+    }).catch(() => {});
+    KlikaData.cuadrillas.lista().then((res) => {
+      const arr = res.data ?? res;
+      if (arr.length) setCuadrillas(arr);
+    }).catch(() => {});
+  }, []);
+
   const lista = regs.filter((r) => crew === "todas" || r.cuadrilla === crew);
-  const crewNom = (id) => CUADRILLAS.find((c) => c.id === id)?.nombre.split("—")[1]?.trim() || id;
+  const crewNom = (id) => cuadrillas.find((c) => c.id === id)?.nombre?.split("—")[1]?.trim() || id;
 
   function abrir(r) { setEdit(r); setForm({ entrada: r.entrada === "—" ? "" : r.entrada, salida: r.salida === "—" ? "" : r.salida, estado: r.estado, motivo: r.motivo || "" }); }
-  function guardar() {
+
+  async function guardar() {
+    const corrector = ROLES?.[role]?.nombre ?? role;
     setRegs((arr) => arr.map((r) => r.id === edit.id ? {
       ...r, entrada: form.entrada || "—", salida: form.salida || "—", estado: form.estado,
-      motivo: form.motivo, corregido: { por: ROLES[role].nombre },
+      motivo: form.motivo, corregido: { por: corrector },
     } : r));
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.asistencias.corregir(edit.id, {
+        hora_entrada: form.entrada || null,
+        hora_salida: form.salida || null,
+        estado: form.estado,
+        motivo_correccion: form.motivo || null,
+      }).catch(() => {});
+    }
     setEdit(null);
   }
 
@@ -28,9 +66,9 @@ function Asistencias({ role }) {
       <div style={as.toolbar}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className={"chip" + (crew === "todas" ? " active" : "")} onClick={() => setCrew("todas")}>Todas</button>
-          {CUADRILLAS.map((c) => (
+          {cuadrillas.map((c) => (
             <button key={c.id} className={"chip" + (crew === c.id ? " active" : "")} onClick={() => setCrew(c.id)}>
-              <span style={{ width: 8, height: 8, borderRadius: 3, background: c.color, display: "inline-block", marginRight: 6 }} />{c.nombre.split("—")[0].trim()}
+              <span style={{ width: 8, height: 8, borderRadius: 3, background: c.color ?? "var(--ink-300)", display: "inline-block", marginRight: 6 }} />{(c.nombre ?? "").split("—")[0].trim()}
             </button>
           ))}
         </div>

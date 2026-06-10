@@ -1,8 +1,8 @@
-/* global React, Icon, TechosLogo, KlikaWord, StarMark, Toggle */
+/* global React, Icon, TechosLogo, KlikaWord, StarMark, Toggle, KlikaData */
 // ============================================================
 //  Pantalla · Configuración / Ajustes  (solo dueño)
 // ============================================================
-const { useState: useStateCfg, useRef: useRefCfg } = React;
+const { useState: useStateCfg, useRef: useRefCfg, useEffect: useEffectCfg } = React;
 
 const CFG_SECCIONES = [
   { k: "empresa",   label: "Identidad de la empresa", icon: "clients",  desc: "Datos y logo" },
@@ -11,10 +11,36 @@ const CFG_SECCIONES = [
   { k: "branding",  label: "Branding del sistema",    icon: "sparkle",  desc: "Klika y colores" },
 ];
 
+const CFG_DEFAULT = {
+  nombre_empresa: "Techos Estrella SRL", rnc: "1-31-45678-9",
+  telefono: "809-580-1993", email: "info@techosestrella.com",
+  direccion: "Av. 27 de Febrero #45, Los Jardines Metropolitanos, Santiago de los Caballeros, R.D.",
+  itbis_activo: true, itbis_pct: 18, moneda: "DOP",
+  clima_apto: 30, clima_bloqueado: 60,
+  pie_cotizacion: "Cotización válida por 30 días. Precios sujetos a cambio sin previo aviso. No incluye trabajos no especificados. Anticipo del 50% para iniciar la obra.\nGracias por confiar en Techos Estrella — impermeabilizando Santiago desde 1993.",
+  garantia_default: "Techos Estrella SRL garantiza el sistema de impermeabilización aplicado por un período de 7 años contra filtraciones, cubriendo materiales y mano de obra.\nLa garantía no cubre daños por terceros, modificaciones estructurales, ni mantenimiento inadecuado. Requiere inspección anual gratuita coordinada con la empresa.",
+};
+
 function Configuracion() {
   const [sec, setSec] = useStateCfg("empresa");
   const [saved, setSaved] = useStateCfg(null);
-  function guardar(s) { setSaved(s); setTimeout(() => setSaved(null), 2200); }
+  const [cfg, setCfg] = useStateCfg(CFG_DEFAULT);
+
+  useEffectCfg(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.config.get().then((res) => {
+      const d = res.data ?? res;
+      setCfg((c) => ({ ...c, ...d }));
+    }).catch(() => {});
+  }, []);
+
+  async function guardar(secKey, cambios) {
+    setCfg((c) => ({ ...c, ...cambios }));
+    setSaved(secKey); setTimeout(() => setSaved(null), 2200);
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.config.guardar(cambios).catch(() => {});
+    }
+  }
 
   return (
     <div style={cf.page} className="r-page r-main">
@@ -36,10 +62,10 @@ function Configuracion() {
 
       {/* contenido */}
       <div style={{ minWidth: 0 }}>
-        {sec === "empresa"  && <SecEmpresa  onSave={() => guardar("empresa")}  saved={saved === "empresa"} />}
-        {sec === "sistema"  && <SecSistema  onSave={() => guardar("sistema")}  saved={saved === "sistema"} />}
-        {sec === "pdf"      && <SecPDF       onSave={() => guardar("pdf")}      saved={saved === "pdf"} />}
-        {sec === "branding" && <SecBranding  onSave={() => guardar("branding")} saved={saved === "branding"} />}
+        {sec === "empresa"  && <SecEmpresa  cfg={cfg} onSave={(c) => guardar("empresa", c)}  saved={saved === "empresa"} />}
+        {sec === "sistema"  && <SecSistema  cfg={cfg} onSave={(c) => guardar("sistema", c)}  saved={saved === "sistema"} />}
+        {sec === "pdf"      && <SecPDF       cfg={cfg} onSave={(c) => guardar("pdf", c)}      saved={saved === "pdf"} />}
+        {sec === "branding" && <SecBranding  onSave={() => guardar("branding", {})} saved={saved === "branding"} />}
       </div>
     </div>
   );
@@ -54,11 +80,11 @@ function SecHead({ title, sub }) {
     </div>
   );
 }
-function SaveBar({ onSave, saved }) {
+function SaveBar({ onSave, saved, onCancel }) {
   return (
     <div style={cf.saveBar}>
       {saved && <span style={cf.savedMsg}><Icon name="checkcircle" size={16} color="var(--green)" /> Cambios guardados</span>}
-      <button className="btn btn-ghost" type="button">Cancelar</button>
+      <button className="btn btn-ghost" type="button" onClick={onCancel}>Cancelar</button>
       <button className="btn btn-primary" type="button" onClick={onSave}><Icon name="check" size={16} /> Guardar cambios</button>
     </div>
   );
@@ -76,8 +102,10 @@ function FieldRow({ label, hint, children, full }) {
 }
 
 // ================= 1 · Identidad de la empresa =================
-function SecEmpresa({ onSave, saved }) {
+function SecEmpresa({ cfg, onSave, saved }) {
   const fileRef = useRefCfg(null);
+  const [f, setF] = useStateCfg({ nombre_empresa: cfg.nombre_empresa, rnc: cfg.rnc, telefono: cfg.telefono, email: cfg.email, direccion: cfg.direccion });
+  const fld = (k) => ({ value: f[k] ?? "", onChange: (e) => setF((p) => ({ ...p, [k]: e.target.value })) });
   return (
     <div style={cf.col}>
       <SecHead title="Identidad de la empresa" sub="Estos datos aparecen en cotizaciones, PDF y el portal del cliente." />
@@ -92,33 +120,24 @@ function SecEmpresa({ onSave, saved }) {
             </div>
           </div>
         </FieldRow>
-        <FieldRow label="Nombre de la empresa" hint="Razón social completa.">
-          <input className="input" defaultValue="Techos Estrella SRL" />
-        </FieldRow>
-        <FieldRow label="RNC" hint="Aparece en los documentos PDF y facturas.">
-          <input className="input" defaultValue="1-31-45678-9" style={{ maxWidth: 260 }} />
-        </FieldRow>
-        <FieldRow label="Teléfono">
-          <input className="input" defaultValue="809-580-1993" style={{ maxWidth: 260 }} />
-        </FieldRow>
-        <FieldRow label="Correo electrónico">
-          <input className="input" type="email" defaultValue="info@techosestrella.com" style={{ maxWidth: 360 }} />
-        </FieldRow>
-        <FieldRow label="Dirección">
-          <textarea className="input" rows={2} style={{ height: "auto", padding: "11px 14px", resize: "vertical" }} defaultValue="Av. 27 de Febrero #45, Los Jardines Metropolitanos, Santiago de los Caballeros, R.D." />
-        </FieldRow>
+        <FieldRow label="Nombre de la empresa" hint="Razón social completa."><input className="input" {...fld("nombre_empresa")} /></FieldRow>
+        <FieldRow label="RNC" hint="Aparece en los documentos PDF y facturas."><input className="input" {...fld("rnc")} style={{ maxWidth: 260 }} /></FieldRow>
+        <FieldRow label="Teléfono"><input className="input" {...fld("telefono")} style={{ maxWidth: 260 }} /></FieldRow>
+        <FieldRow label="Correo electrónico"><input className="input" type="email" {...fld("email")} style={{ maxWidth: 360 }} /></FieldRow>
+        <FieldRow label="Dirección"><textarea className="input" rows={2} style={{ height: "auto", padding: "11px 14px", resize: "vertical" }} {...fld("direccion")} /></FieldRow>
       </section>
-      <SaveBar onSave={onSave} saved={saved} />
+      <SaveBar onSave={() => onSave(f)} onCancel={() => setF({ nombre_empresa: cfg.nombre_empresa, rnc: cfg.rnc, telefono: cfg.telefono, email: cfg.email, direccion: cfg.direccion })} saved={saved} />
     </div>
   );
 }
 
 // ================= 2 · Configuración del sistema =================
-function SecSistema({ onSave, saved }) {
-  const [itbis, setItbis] = useStateCfg(true);
-  const [pct, setPct] = useStateCfg(18);
-  const [apto, setApto] = useStateCfg(30);      // lluvia < apto = apto
-  const [bloq, setBloq] = useStateCfg(60);      // lluvia > bloq = bloqueado
+function SecSistema({ cfg, onSave, saved }) {
+  const [itbis, setItbis] = useStateCfg(cfg.itbis_activo !== false);
+  const [pct, setPct] = useStateCfg(cfg.itbis_pct ?? 18);
+  const [moneda, setMoneda] = useStateCfg(cfg.moneda ?? "DOP");
+  const [apto, setApto] = useStateCfg(cfg.clima_apto ?? 30);
+  const [bloq, setBloq] = useStateCfg(cfg.clima_bloqueado ?? 60);
 
   return (
     <div style={cf.col}>
@@ -138,7 +157,7 @@ function SecSistema({ onSave, saved }) {
           </div>
         </FieldRow>
         <FieldRow label="Moneda" hint="Moneda para precios y documentos.">
-          <select className="input" defaultValue="DOP" style={{ maxWidth: 280 }}>
+          <select className="input" value={moneda} onChange={(e) => setMoneda(e.target.value)} style={{ maxWidth: 280 }}>
             <option value="DOP">DOP — Peso dominicano (RD$)</option>
             <option value="USD">USD — Dólar estadounidense (US$)</option>
             <option value="EUR">EUR — Euro (€)</option>
@@ -183,7 +202,7 @@ function SecSistema({ onSave, saved }) {
           <Resume color="var(--red)" t="Bloqueado" v={`> ${bloq}% de lluvia`} />
         </div>
       </section>
-      <SaveBar onSave={onSave} saved={saved} />
+      <SaveBar onSave={() => onSave({ itbis_activo: itbis, itbis_pct: pct, moneda, clima_apto: apto, clima_bloqueado: bloq })} onCancel={() => {}} saved={saved} />
     </div>
   );
 }
@@ -215,7 +234,9 @@ function Resume({ color, t, v }) {
 }
 
 // ================= 3 · Documentos PDF =================
-function SecPDF({ onSave, saved }) {
+function SecPDF({ cfg, onSave, saved }) {
+  const [pie, setPie] = useStateCfg(cfg.pie_cotizacion ?? "");
+  const [garantia, setGarantia] = useStateCfg(cfg.garantia_default ?? "");
   return (
     <div style={cf.col}>
       <SecHead title="Documentos PDF" sub="Textos y apariencia de las cotizaciones y certificados que recibe el cliente." />
@@ -227,10 +248,10 @@ function SecPDF({ onSave, saved }) {
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
             <TechosLogo scale={0.7} />
             <div style={{ textAlign: "right", fontSize: 11, color: "var(--ink-500)", lineHeight: 1.6 }}>
-              <div style={{ fontWeight: 700, color: "var(--ink-900)", fontSize: 12 }}>Techos Estrella SRL</div>
-              <div>RNC 1-31-45678-9</div>
-              <div>809-580-1993 · info@techosestrella.com</div>
-              <div>Av. 27 de Febrero #45, Santiago, R.D.</div>
+              <div style={{ fontWeight: 700, color: "var(--ink-900)", fontSize: 12 }}>{cfg.nombre_empresa}</div>
+              <div>RNC {cfg.rnc}</div>
+              <div>{cfg.telefono} · {cfg.email}</div>
+              <div>{cfg.direccion?.split(",").slice(0, 2).join(",")}</div>
             </div>
           </div>
           <div style={{ height: 2, background: "var(--blue-600)", margin: "14px 0 12px", borderRadius: 2 }} />
@@ -246,15 +267,13 @@ function SecPDF({ onSave, saved }) {
 
       <section className="card" style={cf.card}>
         <FieldRow label="Pie de página de cotizaciones" hint="Texto al final de cada cotización PDF." full>
-          <textarea className="input" rows={3} style={{ height: "auto", padding: "11px 14px", resize: "vertical", lineHeight: 1.5 }}
-            defaultValue={"Cotización válida por 30 días. Precios sujetos a cambio sin previo aviso. No incluye trabajos no especificados. Anticipo del 50% para iniciar la obra.\nGracias por confiar en Techos Estrella — impermeabilizando Santiago desde 1993."} />
+          <textarea className="input" rows={3} style={{ height: "auto", padding: "11px 14px", resize: "vertical", lineHeight: 1.5 }} value={pie} onChange={(e) => setPie(e.target.value)} />
         </FieldRow>
         <FieldRow label="Condiciones de garantía por defecto" hint="Se pre-llena en cada obra nueva. Puede editarse por obra." full>
-          <textarea className="input" rows={4} style={{ height: "auto", padding: "11px 14px", resize: "vertical", lineHeight: 1.5 }}
-            defaultValue={"Techos Estrella SRL garantiza el sistema de impermeabilización aplicado por un período de 7 años contra filtraciones, cubriendo materiales y mano de obra.\nLa garantía no cubre daños por terceros, modificaciones estructurales, ni mantenimiento inadecuado. Requiere inspección anual gratuita coordinada con la empresa."} />
+          <textarea className="input" rows={4} style={{ height: "auto", padding: "11px 14px", resize: "vertical", lineHeight: 1.5 }} value={garantia} onChange={(e) => setGarantia(e.target.value)} />
         </FieldRow>
       </section>
-      <SaveBar onSave={onSave} saved={saved} />
+      <SaveBar onSave={() => onSave({ pie_cotizacion: pie, garantia_default: garantia })} onCancel={() => { setPie(cfg.pie_cotizacion ?? ""); setGarantia(cfg.garantia_default ?? ""); }} saved={saved} />
     </div>
   );
 }
@@ -298,7 +317,7 @@ function SecBranding({ onSave, saved }) {
           </div>
         </FieldRow>
       </section>
-      <SaveBar onSave={onSave} saved={saved} />
+      <SaveBar onSave={() => onSave({ color_primario: primario, color_acento: acento })} onCancel={() => {}} saved={saved} />
     </div>
   );
 }

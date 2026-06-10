@@ -91,6 +91,11 @@ const KlikaStore = (function () {
       if (m) { m.stock = Math.max(0, nuevoStock); emit(); }
     },
     agregarMaterial(mat) { materiales.push(mat); emit(); },
+    cargarMateriales(arr) { materiales.splice(0, materiales.length, ...arr); emit(); },
+    reemplazarMaterial(oldId, nuevo) {
+      const i = materiales.findIndex((m) => m.id === oldId);
+      if (i >= 0) { materiales[i] = nuevo; emit(); }
+    },
 
     // -------- Solicitudes de cambio --------
     pendientes() { return requests.filter((r) => r.estado === "pendiente"); },

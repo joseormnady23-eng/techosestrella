@@ -1,8 +1,8 @@
-/* global React, Icon, USUARIOS, ROLES */
+/* global React, Icon, USUARIOS, ROLES, KlikaData */
 // ============================================================
 //  Pantalla · Usuarios (cuentas y permisos · solo dueño)
 // ============================================================
-const { useState: useStateUs } = React;
+const { useState: useStateUs, useEffect: useEffectUs } = React;
 const ROL_META = {
   dueno:      { label: "Dueño",      cls: "badge-purple" },
   secretaria: { label: "Secretaria", cls: "badge-blue" },
@@ -16,6 +16,17 @@ function Usuarios({ role }) {
   const [editId, setEditId] = useStateUs(null);
   const vacio = () => ({ nombre: "", rol: "aplicador", tel: "", correo: "" });
   const [form, setForm] = useStateUs(vacio);
+
+  useEffectUs(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.usuarios.lista().then((res) => {
+      const arr = (res.data ?? res).map((u) => ({
+        id: u.id, nombre: u.nombre ?? "", rol: u.rol ?? "aplicador",
+        tel: u.telefono ?? "", correo: u.email ?? "", activo: u.activo !== false,
+      }));
+      if (arr.length) setUsers(arr);
+    }).catch(() => {});
+  }, []);
 
   if (role !== "dueno") {
     return (
@@ -31,16 +42,33 @@ function Usuarios({ role }) {
 
   function abrirCrear() { setEditId(null); setForm(vacio()); setModal(true); }
   function abrirEditar(u) { setEditId(u.id); setForm({ nombre: u.nombre, rol: u.rol, tel: u.tel, correo: u.correo }); setModal(true); }
-  function guardar() {
+
+  async function guardar() {
     if (!form.nombre.trim()) return;
-    if (editId) setUsers((arr) => arr.map((u) => u.id === editId ? { ...u, ...form } : u));
-    else {
-      const id = "U-" + (users.length + 1);
-      setUsers((arr) => [...arr, { id, activo: true, ...form }]);
+    const payload = { nombre: form.nombre, rol: form.rol, telefono: form.tel || null, email: form.correo || null, password: form.password || undefined };
+    if (editId) {
+      setUsers((arr) => arr.map((u) => u.id === editId ? { ...u, ...form } : u));
+      if (window.KlikaData && KlikaData.conectado()) KlikaData.usuarios.actualizar(editId, payload).catch(() => {});
+    } else {
+      const tempId = "U-" + (users.length + 1);
+      setUsers((arr) => [...arr, { id: tempId, activo: true, ...form }]);
+      if (window.KlikaData && KlikaData.conectado()) {
+        try {
+          const raw = await KlikaData.usuarios.crear({ ...payload, password: form.password || "Klika2024!" });
+          const created = { id: raw.data?.id ?? raw.id ?? tempId, nombre: raw.data?.nombre ?? form.nombre, rol: form.rol, tel: form.tel, correo: form.correo, activo: true };
+          setUsers((arr) => arr.map((u) => u.id === tempId ? created : u));
+        } catch (e) { console.error("guardar usuario", e); }
+      }
     }
     setModal(false);
   }
-  function toggleActivo(u) { setUsers((arr) => arr.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x)); }
+
+  async function toggleActivo(u) {
+    setUsers((arr) => arr.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x));
+    if (window.KlikaData && KlikaData.conectado()) {
+      if (u.activo) KlikaData.usuarios.desactivar(u.id).catch(() => {});
+    }
+  }
 
   return (
     <div style={us.page} className="r-page">

@@ -379,7 +379,7 @@ function IndependentQuote({ quote, role, onPortal, onSave }) {
           </button>
           <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} disabled={!puedeGuardar}><Icon name="whatsapp" size={18} /> Enviar por WhatsApp</button>
           <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }} disabled={!puedeGuardar}><Icon name="mail" size={17} /> Enviar por correo</button>
-          <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }} disabled={!puedeGuardar}><Icon name="download" size={17} /> Descargar PDF</button>
+          <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }} disabled={!puedeGuardar} onClick={() => { if (quote._id && window.KlikaData) window.open(KlikaData.cotizaciones.pdf(quote._id)); }}><Icon name="download" size={17} /> Descargar PDF</button>
           {!puedeGuardar && <div style={{ fontSize: 11.5, color: "var(--ink-400)", lineHeight: 1.4 }}>Agrega un cliente y al menos un item para guardar o enviar.</div>}
         </div>
 
@@ -434,15 +434,59 @@ function indepTotal(c) {
 // ============================================================
 //  Pantalla 5 · Cotizaciones (listado + motores: obra / independiente)
 // ============================================================
+const { useEffect: useEffectCot, useRef: useRefCot } = React;
+
+function mapCotizacion(c) {
+  return {
+    id: c.codigo ?? String(c.id),
+    _id: c.id,
+    clienteId: c.cliente_id ?? null,
+    cliente: c.cliente?.nombre ?? "",
+    desc: c.descripcion ?? "",
+    estado: c.estado ?? "borrador",
+    itbis: c.itbis ?? true,
+    descTipo: c.tipo_descuento ?? "pct",
+    descVal: Number(c.descuento ?? 0),
+    items: (c.items ?? []).map((it) => ({
+      id: it.id, tipo: it.material_id ? "material" : "manual",
+      matId: it.material_id ?? null, desc: it.descripcion ?? "",
+      cant: Number(it.cantidad ?? 1), unidad: it.unidad ?? "ud",
+      precio: Number(it.precio_unitario ?? 0),
+    })),
+    total: Number(c.total ?? 0),
+    obraId: c.obra_id ?? null,
+  };
+}
+
 function Cotizacion({ onNav, role, onPortal }) {
-  const cotizables = window.OBRAS.filter((o) => ["cotizada", "aprobada"].includes(o.estado));
+  const cotizablesMock = window.OBRAS.filter((o) => ["cotizada", "aprobada"].includes(o.estado));
   const [indeps, setIndeps] = useStateQ(() => window.COTIZ_INDEP.map((c) => ({ ...c })));
-  const [sel, setSel] = useStateQ(cotizables[0]?.id || (indeps[0] && indeps[0].id) || null);
+  const [cotizaciones, setCotizaciones] = useStateQ([]);
+  const [obras, setObras] = useStateQ(cotizablesMock);
+  const [sel, setSel] = useStateQ(cotizablesMock[0]?.id || (window.COTIZ_INDEP[0] && window.COTIZ_INDEP[0].id) || null);
   const [menuOpen, setMenuOpen] = useStateQ(false);
   const [obraPick, setObraPick] = useStateQ(false);
-  const seqRef = window.React.useRef(93);
+  const seqRef = useRefCot(93);
 
-  const obra = window.OBRAS.find((o) => o.id === sel);
+  useEffectCot(() => {
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    KlikaData.cotizaciones.lista({ per_page: 100 }).then((res) => {
+      const arr = (res.data ?? res).map(mapCotizacion);
+      const sinObra = arr.filter((c) => !c.obraId);
+      const conObra = arr.filter((c) => c.obraId);
+      setIndeps(sinObra);
+      if (sinObra.length || conObra.length) {
+        setSel((sinObra[0] ?? conObra[0])?.id ?? sel);
+      }
+    }).catch(() => {});
+    KlikaData.obras.lista({ estado: "cotizada,aprobada" }).then((res) => {
+      const arr = (res.data ?? res).map(KlikaData.map.obra);
+      if (arr.length) setObras(arr);
+    }).catch(() => {});
+  }, []);
+
+  const cotizables = obras;
+  const obra = cotizables.find((o) => o.id === sel || o._id == sel);
   const indep = indeps.find((c) => c.id === sel);
 
   function nuevaIndep() {
@@ -453,8 +497,33 @@ function Cotizacion({ onNav, role, onPortal }) {
     setMenuOpen(false);
   }
   function pickObra(id) { setSel(id); setObraPick(false); setMenuOpen(false); }
-  function saveIndep(id, patch) {
+
+  async function saveIndep(id, patch) {
     setIndeps((arr) => arr.map((c) => c.id === id ? { ...c, ...patch } : c));
+    if (!window.KlikaData || !KlikaData.conectado()) return;
+    const cot = indeps.find((c) => c.id === id);
+    const isNew = !cot?._id;
+    const payload = {
+      cliente_id: patch.clienteId || null,
+      descripcion: patch.desc || null,
+      estado: patch.estado || "cotizada",
+      tipo_descuento: patch.descTipo,
+      descuento: patch.descVal ?? 0,
+      itbis: patch.itbis ?? true,
+      items: (patch.items || []).map((it) => ({
+        material_id: it.matId || null, descripcion: it.desc,
+        cantidad: it.cant, unidad: it.unidad, precio_unitario: it.precio,
+      })),
+    };
+    try {
+      if (isNew) {
+        const raw = await KlikaData.cotizaciones.crear(payload);
+        const nueva = mapCotizacion(raw.data ?? raw);
+        setIndeps((arr) => arr.map((c) => c.id === id ? { ...c, ...nueva } : c));
+      } else {
+        await KlikaData.cotizaciones.actualizar(cot._id, payload);
+      }
+    } catch (e) { console.error("saveIndep", e); }
   }
 
   return (
