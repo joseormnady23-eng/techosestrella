@@ -1,4 +1,5 @@
-/* global React, Icon, OBRAS, CUADRILLAS, ROLES, useKlikaStore, money0, useRHStore, SolicitarAusencia, KlikaAPI, KlikaData */
+/* global React, Icon, OBRAS, useKlikaStore, useRHStore, SolicitarAusencia, KlikaAPI, KlikaData,
+   MisObrasScreen, ObraDetalleMobile, CheckinScreen, MaterialesScreen, FotoScreen, PerfilScreen, PRONOSTICO */
 // ============================================================
 //  Marco de teléfono reutilizable
 // ============================================================
@@ -25,160 +26,229 @@ function PhoneFrame({ children, label }) {
 }
 
 // ============================================================
-//  Pantalla 10 · Vista del aplicador (móvil)
+//  Pantalla 10 · Vista del aplicador (móvil) — orchestrador
 // ============================================================
-function AplicadorMobile({ onKlika, setRole, role }) {
+function AplicadorMobile({ onKlika, setRole }) {
   const store = useKlikaStore();
   const rh = useRHStore();
+
+  // Usuario autenticado
   const yoUser = window.KlikaAPI?.usuario();
   const yo = rh.empleado(yoUser?.id) ?? rh.empleado("U-4") ?? rh.empleados[0];
   const yoNombre = yoUser?.nombre ?? yo?.nombre ?? "Aplicador";
-  const [checkedIn, setCheckedIn] = useStateAp(false);
-  const [asistenciaId, setAsistenciaId] = useStateAp(null);
-  const [scanOpen, setScanOpen] = useStateAp(false);
-  const [ausOpen, setAusOpen] = useStateAp(false);
-  const [misObrasData, setMisObrasData] = useStateAp(null);
 
+  // Datos cargados del backend
+  const [obrasData, setObrasData] = useStateAp(null);
+  const [pronoData, setPronoData] = useStateAp(null);
+
+  // Navegación: tab base + pantalla push encima
+  const [tab, setTabRaw] = useStateAp("obras"); // obras | foto | perfil
+  const [screen, setScreen] = useStateAp(null);  // null | obraDetalle | checkin | materiales | fotoScreen
+  const [obraAbierta, setObraAbierta] = useStateAp(null);
+
+  // Estado runtime
+  const [online, setOnline] = useStateAp(navigator.onLine !== false);
+  const [checkins, setCheckins] = useStateAp({});    // obraId → { entrada, salida }
+  const [asistIds, setAsistIds] = useStateAp({});    // obraId → asistenciaId backend
+  const [fotosRecientes, setFotosRecientes] = useStateAp([]);
+  const [ausOpen, setAusOpen] = useStateAp(false);
+  const [scanOpen, setScanOpen] = useStateAp(false);
+
+  // ---- Carga inicial ----
   useEffectAp(() => {
     if (!window.KlikaData || !KlikaData.conectado()) return;
+
     KlikaData.obras.lista({ per_page: 20 }).then((res) => {
       const arr = (res.data ?? res)
         .filter((o) => ["proceso", "aprobada", "en_proceso"].includes(o.estado))
         .map((o) => ({
           id: o.codigo ?? String(o.id), _id: o.id,
-          clienteNom: o.cliente?.nombre ?? "", titulo: o.titulo ?? "",
-          cuadrilla: o.cuadrilla_id ?? null, estado: o.estado === "en_proceso" ? "proceso" : (o.estado ?? "proceso"),
-          direccion: o.direccion ?? "", total: Number(o.total ?? 0),
+          clienteNom: o.cliente?.nombre ?? "Cliente",
+          titulo: o.titulo ?? "",
+          cuadrilla: o.cuadrilla_id ?? null,
+          estado: o.estado === "en_proceso" ? "proceso" : (o.estado ?? "proceso"),
+          direccion: o.direccion ?? "",
+          total: Number(o.total ?? 0),
+          mapa: o.ubicacion_visible !== false,
+          secciones: o.secciones?.length ? o.secciones : [{ m2: o.m2_total ?? 120, manos: 2 }],
         }));
-      if (arr.length) setMisObrasData(arr);
+      if (arr.length) {
+        setObrasData(arr);
+        // Cargar clima de la primera obra para el pronóstico
+        KlikaData.obras.clima(arr[0]._id).then((cr) => {
+          const dias = (cr.data ?? cr).dias ?? cr;
+          if (Array.isArray(dias) && dias.length) {
+            const DIAS_NAMES = ["Hoy", "Mié", "Jue", "Vie", "Sáb", "Dom", "Lun"];
+            setPronoData(dias.slice(0, 7).map((d, i) => {
+              const prob = Number(d.prob_lluvia ?? d.precipitacion ?? 0);
+              const cond = d.bloqueado ? "bad" : d.apto === false ? "warn" : prob >= 80 ? "bad" : prob >= 40 ? "warn" : "ok";
+              return { dia: DIAS_NAMES[i] ?? `D${i + 1}`, icon: cond === "bad" ? "rain" : cond === "warn" ? "cloud" : "sun", prob, cond };
+            }));
+          }
+        }).catch(() => {});
+      }
     }).catch(() => {});
   }, []);
 
-  const misObras = misObrasData ?? OBRAS.filter((o) => o.cuadrilla === "CU-1" && ["proceso", "aprobada"].includes(o.estado));
+  const misObras = obrasData ?? OBRAS.filter((o) => o.cuadrilla === "CU-1" && ["proceso", "aprobada"].includes(o.estado));
+
+  // Construir arrays para MisObrasScreen
+  const hoyObras = misObras.slice(0, 1).map((o) => ({ obra: o, cond: "ok" }));
+  const DIAS_SEM = ["Mié 4", "Jue 5", "Vie 6", "Sáb 7", "Dom 8", "Lun 9"];
+  const semanaObras = misObras.slice(1, 7).map((o, i) => ({ obra: o, dia: DIAS_SEM[i] ?? "—", cond: "ok" }));
+
+  // ---- Helpers de navegación ----
+  function setTab(t) { setTabRaw(t); setScreen(null); if (t !== "obras") setObraAbierta(null); }
+
+  function abrirObra(obra) { setObraAbierta(obra); setScreen("obraDetalle"); }
+
+  function confirmarCheckin(hora) {
+    if (!obraAbierta) return;
+    setCheckins((c) => ({ ...c, [obraAbierta.id]: { entrada: hora, salida: null } }));
+    if (window.KlikaData && KlikaData.conectado()) {
+      KlikaData.asistencias.checkin({ obra_id: obraAbierta._id ?? obraAbierta.id })
+        .then((r) => { if (r?.id) setAsistIds((m) => ({ ...m, [obraAbierta.id]: r.id })); })
+        .catch(() => {});
+    }
+    setScreen("obraDetalle");
+  }
+
+  function hacerCheckout() {
+    if (!obraAbierta) return;
+    const h = new Date().toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit", hour12: true });
+    setCheckins((c) => ({ ...c, [obraAbierta.id]: { ...c[obraAbierta.id], salida: h } }));
+    if (window.KlikaData && KlikaData.conectado()) {
+      const aId = asistIds[obraAbierta.id];
+      if (aId) KlikaData.asistencias.checkout({ asistencia_id: aId }).catch(() => {});
+    }
+  }
+
+  function subirFoto(data) {
+    setFotosRecientes((f) => [data, ...f].slice(0, 8));
+  }
+
+  // Datos del perfil
+  const dispVac = yo ? rh.vacacionesDisponibles(yo) : 0;
+  const derecho = yo ? rh.derechoVacaciones(yo) : 30;
+  const tomadas = yo ? rh.vacacionesTomadas(yo) : 0;
   const misAus = (yo ? rh.ausenciasDe(yo.id) : rh.ausenciasDe("U-4")).sort((a, b) => b.ini.localeCompare(a.ini));
-  const dispVac = rh.vacacionesDisponibles(yo);
+
+  const checkinActual = obraAbierta ? (checkins[obraAbierta.id] ?? null) : null;
+  const historial = checkinActual ? [
+    { tipo: "entrada", hora: checkinActual.entrada },
+    ...(checkinActual.salida ? [{ tipo: "salida", hora: checkinActual.salida }] : []),
+  ] : [];
 
   return (
     <PhoneFrame>
-      <div style={ap.wrap}>
-        {/* header */}
-        <div style={ap.header}>
-          <div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,.75)" }}>Hola,</div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: "#fff" }}>{yoNombre.split(" ")[0]}</div>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+
+        {/* === PANTALLAS BASE (por tab) === */}
+        {tab === "obras" && (
+          <MisObrasScreen
+            nombre={yoNombre.split(" ")[0]}
+            hoyObras={hoyObras}
+            semanaObras={semanaObras}
+            onOpenObra={abrirObra}
+            online={online}
+            onToggleOnline={() => setOnline((v) => !v)}
+            onKlika={onKlika}
+            onLogout={() => setRole("dueno")}
+            pronostico={pronoData ?? PRONOSTICO}
+          />
+        )}
+        {tab === "foto" && (
+          <FotoScreen
+            obra={null}
+            obras={misObras}
+            online={online}
+            recientes={fotosRecientes}
+            onBack={null}
+            onSubir={subirFoto}
+            onPickObra={(id) => setObraAbierta(misObras.find((o) => o.id === id))}
+          />
+        )}
+        {tab === "perfil" && (
+          <PerfilScreen
+            nombre={yoNombre}
+            cargo={yo?.cargo ?? "Aplicador"}
+            color={yo?.color ?? "var(--blue-600)"}
+            dispVac={dispVac}
+            derecho={derecho}
+            tomadas={tomadas}
+            misAus={misAus}
+            rh={rh}
+            online={online}
+            onToggleOnline={() => setOnline((v) => !v)}
+            onSolicitar={() => setAusOpen(true)}
+            onLogout={() => setRole("dueno")}
+          />
+        )}
+
+        {/* === BARRA DE TABS (visible solo cuando no hay push screen) === */}
+        {!screen && (
+          <div style={ap.tabBar}>
+            {[
+              { key: "obras", icon: "location", label: "Mis obras" },
+              { key: "foto",  icon: "camera",   label: "Fotos" },
+              { key: "perfil", icon: "user",    label: "Perfil" },
+            ].map((t) => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                style={{ ...ap.tabBtn, color: tab === t.key ? "var(--blue-600)" : "var(--ink-400)" }}>
+                <Icon name={t.icon} size={22} color={tab === t.key ? "var(--blue-600)" : "var(--ink-400)"} />
+                <span style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>{t.label}</span>
+              </button>
+            ))}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onKlika} style={ap.headBtn}><Icon name="sparkle" size={20} color="#fff" /></button>
-            <button onClick={() => setRole("dueno")} style={ap.headBtn} title="Salir de vista aplicador"><Icon name="logout" size={19} color="#fff" /></button>
-          </div>
-        </div>
+        )}
 
-        <div style={{ padding: "0 16px 24px", marginTop: -28 }}>
-          {/* check-in grande */}
-          <button onClick={async () => {
-            if (!checkedIn) {
-              setCheckedIn(true);
-              if (window.KlikaData && KlikaData.conectado()) {
-                const obraId = misObras[0]?._id ?? misObras[0]?.id;
-                KlikaData.asistencias.checkin({ obra_id: obraId })
-                  .then((res) => { if (res?.id) setAsistenciaId(res.id); })
-                  .catch(() => {});
-              }
-            } else {
-              setCheckedIn(false);
-              if (asistenciaId && window.KlikaData && KlikaData.conectado()) {
-                KlikaData.asistencias.checkout({ asistencia_id: asistenciaId }).catch(() => {});
-                setAsistenciaId(null);
-              }
-            }
-          }} style={{ ...ap.checkin, background: checkedIn ? "var(--green)" : "var(--blue-600)" }}>
-            <span style={ap.checkinIcon}><Icon name={checkedIn ? "checkcircle" : "location"} size={34} color="#fff" /></span>
-            <div style={{ textAlign: "left", flex: 1 }}>
-              <div style={{ fontSize: 19, fontWeight: 800, color: "#fff" }}>{checkedIn ? "Asistencia marcada" : "Marcar asistencia"}</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 2 }}>{checkedIn ? "Check-in registrado ✓" : "Check-in con tu ubicación (GPS)"}</div>
-            </div>
-          </button>
-
-          {/* escanear código de barras (almacén) */}
-          <button onClick={() => setScanOpen(true)} style={ap.scanBig}>
-            <span style={ap.scanBigIcon}><Icon name="barcode" size={30} color="#fff" /></span>
-            <div style={{ textAlign: "left", flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Escanear material</div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", marginTop: 2 }}>Lee el código de barras con la cámara</div>
-            </div>
-            <Icon name="camera" size={24} color="rgba(255,255,255,.9)" />
-          </button>
-
-          {/* acciones grandes */}
-          <div style={ap.bigGrid}>
-            <button style={ap.bigBtn}><span style={{ ...ap.bigIcon, background: "var(--blue-50)" }}><Icon name="camera" size={28} color="var(--blue-600)" /></span><span style={ap.bigLbl}>Subir fotos</span></button>
-            <button style={ap.bigBtn}><span style={{ ...ap.bigIcon, background: "var(--purple-bg)" }}><Icon name="location" size={28} color="var(--purple)" /></span><span style={ap.bigLbl}>Cómo llegar</span></button>
-          </div>
-
-          {/* mis obras de hoy */}
-          <div style={ap.sectionTitle}>Mis obras de hoy</div>
-          {misObras.map((o) => (
-            <div key={o.id} style={ap.obraCard}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span className="mono" style={{ fontSize: 12, color: "var(--ink-400)", fontWeight: 600 }}>{o.id}</span>
-                <span className="badge badge-amber" style={{ height: 22 }}><span className="dot" />En proceso</span>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 16, marginTop: 8 }}>{o.clienteNom.split("·")[0]}</div>
-              <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 2 }}>{o.titulo}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10, fontSize: 13, color: "var(--ink-500)" }}>
-                <Icon name="location" size={15} color="var(--blue-600)" /> {o.direccion.split(",")[0]}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <button className="btn btn-soft" style={{ flex: 1, justifyContent: "center", height: 46, fontSize: 14.5 }}><Icon name="camera" size={18} /> Fotos</button>
-                <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center", height: 46, fontSize: 14.5 }}><Icon name="location" size={18} /> Ir</button>
-              </div>
-            </div>
-          ))}
-
-          {/* mis vacaciones */}
-          <div style={ap.sectionTitle}>Mis vacaciones</div>
-          <div style={ap.vacHero}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
-              <div>
-                <div className="tnum" style={{ fontSize: 44, fontWeight: 800, lineHeight: 1, color: "#fff" }}>{dispVac}</div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", marginTop: 4, fontWeight: 600 }}>días disponibles</div>
-              </div>
-              <div style={{ marginLeft: "auto", fontSize: 12.5, color: "rgba(255,255,255,.72)", textAlign: "right", lineHeight: 1.5 }}>
-                {rh.vacacionesTomadas(yo)} tomados<br />de {rh.derechoVacaciones(yo)} al año
-              </div>
-            </div>
-            <button onClick={() => setAusOpen(true)} style={ap.vacBtn}><Icon name="plus" size={18} color="var(--ink-900)" /> Solicitar ausencia</button>
-          </div>
-
-          <div style={{ ...ap.sectionTitle, marginTop: 18 }}>Mis solicitudes</div>
-          {misAus.length === 0 ? (
-            <div style={{ fontSize: 13.5, color: "var(--ink-400)", padding: "4px 2px" }}>Aún no has solicitado ausencias.</div>
-          ) : misAus.map((a) => {
-            const t = rh.TIPO_AUSENCIA[a.tipo];
-            const est = rh.AUSENCIA_ESTADO[a.estado];
-            const habiles = rh.diasHabiles(a.ini, a.fin);
-            return (
-              <div key={a.id} style={ap.ausCard}>
-                <span style={{ ...ap.ausIcon, background: t.color + "1A" }}><Icon name={t.icon} size={18} color={t.color} /></span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label} · <span className="tnum" style={{ color: "var(--ink-500)", fontWeight: 600 }}>{habiles} {habiles === 1 ? "día" : "días"}</span></div>
-                  <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 2 }}>{rh.fmtFecha(a.ini)} — {rh.fmtFecha(a.fin)}</div>
-                  {a.motivoRechazo && <div style={{ fontSize: 11.5, color: "var(--red-ink)", marginTop: 3, lineHeight: 1.35 }}>Rechazo: {a.motivoRechazo}</div>}
-                </div>
-                <span className={"badge " + est.cls}><span className="dot" />{est.label}</span>
-              </div>
-            );
-          })}
-
-          <div style={ap.note}>
-            <Icon name="shield" size={15} color="var(--ink-400)" />
-            <span>Solo ves las obras asignadas a tu cuadrilla. Las finanzas no se muestran.</span>
-          </div>
-        </div>
+        {/* === PUSH SCREENS (absolutos, cubren todo) === */}
+        {screen === "obraDetalle" && obraAbierta && (
+          <ObraDetalleMobile
+            obra={obraAbierta}
+            checkin={checkinActual}
+            historial={historial}
+            online={online}
+            onBack={() => setScreen(null)}
+            onCheckin={() => setScreen("checkin")}
+            onCheckout={hacerCheckout}
+            onFoto={() => setScreen("fotoScreen")}
+            onMateriales={() => setScreen("materiales")}
+          />
+        )}
+        {screen === "checkin" && obraAbierta && (
+          <CheckinScreen
+            obra={obraAbierta}
+            online={online}
+            onBack={() => setScreen("obraDetalle")}
+            onConfirm={confirmarCheckin}
+          />
+        )}
+        {screen === "materiales" && obraAbierta && (
+          <MaterialesScreen
+            obra={obraAbierta}
+            store={store}
+            onBack={() => setScreen("obraDetalle")}
+            onScan={() => setScanOpen(true)}
+          />
+        )}
+        {screen === "fotoScreen" && (
+          <FotoScreen
+            obra={obraAbierta}
+            obras={null}
+            online={online}
+            recientes={fotosRecientes}
+            onBack={() => setScreen(obraAbierta ? "obraDetalle" : null)}
+            onSubir={subirFoto}
+            onPickObra={null}
+          />
+        )}
       </div>
+
       {scanOpen && <ScannerOverlay store={store} onClose={() => setScanOpen(false)} />}
       {ausOpen && (
-        <SolicitarAusencia store={rh} empleadoFijo={yo?.id ?? "U-4"} onClose={() => setAusOpen(false)} onSubmit={() => setAusOpen(false)} />
+        <SolicitarAusencia store={rh} empleadoFijo={yo?.id ?? "U-4"}
+          onClose={() => setAusOpen(false)} onSubmit={() => setAusOpen(false)} />
       )}
     </PhoneFrame>
   );
@@ -188,14 +258,13 @@ function AplicadorMobile({ onKlika, setRole, role }) {
 //  Overlay de escáner de código de barras (móvil)
 // ============================================================
 function ScannerOverlay({ store, onClose }) {
-  const [fase, setFase] = useStateAp("buscando"); // buscando | encontrado
+  const [fase, setFase] = useStateAp("buscando");
   const [mat, setMat] = useStateAp(null);
   const videoRef = React.useRef(null);
   const streamRef = React.useRef(null);
 
   React.useEffect(() => {
     let cancel = false;
-    // intenta usar la cámara real; si no, sigue con el visor simulado
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
         .then((stream) => {
@@ -204,7 +273,6 @@ function ScannerOverlay({ store, onClose }) {
           if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
         }).catch(() => {});
     }
-    // simula la detección de un código tras un momento
     const t = setTimeout(() => {
       if (cancel) return;
       const conCodigo = store.materiales.filter((m) => store.codigoDe(m.id));
@@ -228,7 +296,6 @@ function ScannerOverlay({ store, onClose }) {
         <span style={{ fontSize: 15, fontWeight: 700 }}>Escanear material</span>
         <button onClick={onClose} style={sc.closeBtn}><Icon name="x" size={20} color="#fff" /></button>
       </div>
-
       {fase === "buscando" ? (
         <div style={sc.center}>
           <div style={sc.frame}>
@@ -276,24 +343,8 @@ const pf = {
 };
 
 const ap = {
-  wrap: { minHeight: "100%", background: "var(--bg)" },
-  header: { background: "linear-gradient(160deg,var(--ink-900),#23252b)", padding: "16px 18px 44px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
-  headBtn: { width: 40, height: 40, borderRadius: 11, border: "1px solid rgba(255,255,255,.15)", background: "rgba(255,255,255,.08)", display: "grid", placeItems: "center" },
-  checkin: { display: "flex", alignItems: "center", gap: 14, width: "100%", padding: 18, borderRadius: 18, border: "none", boxShadow: "0 12px 30px rgba(30,127,194,.3)", cursor: "pointer" },
-  checkinIcon: { width: 56, height: 56, borderRadius: 14, background: "rgba(255,255,255,.18)", display: "grid", placeItems: "center", flexShrink: 0 },
-  scanBig: { display: "flex", alignItems: "center", gap: 14, width: "100%", padding: 16, marginTop: 12, borderRadius: 18, border: "none", background: "linear-gradient(135deg,var(--ink-900),#2f3a44)", boxShadow: "0 12px 30px rgba(26,26,26,.28)", cursor: "pointer" },
-  scanBigIcon: { width: 52, height: 52, borderRadius: 14, background: "rgba(255,255,255,.14)", display: "grid", placeItems: "center", flexShrink: 0 },
-  bigGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 },
-  bigBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "18px 12px", background: "var(--surface)", border: "1px solid var(--ink-100)", borderRadius: 16, cursor: "pointer" },
-  bigIcon: { width: 58, height: 58, borderRadius: 15, display: "grid", placeItems: "center" },
-  bigLbl: { fontSize: 14.5, fontWeight: 700 },
-  sectionTitle: { fontSize: 13, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: ".5px", margin: "24px 0 12px" },
-  obraCard: { background: "var(--surface)", border: "1px solid var(--ink-100)", borderRadius: 16, padding: 16, marginBottom: 12 },
-  note: { display: "flex", gap: 9, alignItems: "flex-start", marginTop: 18, padding: "12px 13px", background: "var(--ink-100)", borderRadius: 12, fontSize: 12.5, color: "var(--ink-500)", lineHeight: 1.45 },
-  vacHero: { background: "linear-gradient(140deg,var(--star-orange),#d97a1e)", borderRadius: 18, padding: 18, display: "flex", flexDirection: "column", gap: 14, boxShadow: "0 12px 28px rgba(217,122,30,.32)" },
-  vacBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 48, borderRadius: 12, border: "none", background: "#fff", color: "var(--ink-900)", fontSize: 15, fontWeight: 700, cursor: "pointer" },
-  ausCard: { display: "flex", alignItems: "center", gap: 12, padding: 13, background: "var(--surface)", border: "1px solid var(--ink-100)", borderRadius: 14, marginBottom: 10 },
-  ausIcon: { width: 38, height: 38, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0 },
+  tabBar: { display: "flex", borderTop: "1px solid var(--ink-100)", background: "var(--surface)", flexShrink: 0 },
+  tabBtn: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "10px 0 12px", border: "none", background: "transparent", cursor: "pointer", transition: "color .15s" },
 };
 
 const sc = {

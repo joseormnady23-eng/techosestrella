@@ -1,4 +1,4 @@
-/* global React, Icon, OBRAS, money0 */
+/* global React, Icon, OBRAS, money0, KlikaData */
 // ============================================================
 //  Vista aplicador · Pantallas (móvil 390px, manos en obra)
 //  Helpers + 6 pantallas, exportadas a window para AplicadorMobile
@@ -74,11 +74,12 @@ function RingProgress({ value, max, size = 132, stroke = 13, color = "#fff", tra
 }
 
 function Saludo({ nombre }) {
+  const hoy = new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div>
       <div style={{ fontSize: 15, color: "rgba(255,255,255,.78)" }}>Hola,</div>
       <div style={{ fontSize: 23, fontWeight: 800, color: "#fff", letterSpacing: "-.3px" }}>{nombre}</div>
-      <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.6)", marginTop: 3, textTransform: "capitalize" }}>martes 2 de junio</div>
+      <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.6)", marginTop: 3, textTransform: "capitalize" }}>{hoy}</div>
     </div>
   );
 }
@@ -86,7 +87,7 @@ function Saludo({ nombre }) {
 // ============================================================
 //  PANTALLA 1 · Mis obras
 // ============================================================
-function MisObrasScreen({ nombre, hoyObras, semanaObras, onOpenObra, online, onToggleOnline, onKlika, onLogout }) {
+function MisObrasScreen({ nombre, hoyObras, semanaObras, onOpenObra, online, onToggleOnline, onKlika, onLogout, pronostico }) {
   return (
     <div style={apScr.scroll}>
       <div style={apScr.headerDark}>
@@ -97,7 +98,7 @@ function MisObrasScreen({ nombre, hoyObras, semanaObras, onOpenObra, online, onT
             <button onClick={onLogout} style={apScr.headBtn} title="Salir"><Icon name="logout" size={20} color="#fff" /></button>
           </div>
         </div>
-        <Pronostico online={online} onToggleOnline={onToggleOnline} />
+        <Pronostico online={online} onToggleOnline={onToggleOnline} dias={pronostico} />
       </div>
 
       <div style={apScr.body}>
@@ -121,7 +122,8 @@ function MisObrasScreen({ nombre, hoyObras, semanaObras, onOpenObra, online, onT
   );
 }
 
-function Pronostico({ online, onToggleOnline }) {
+function Pronostico({ online, onToggleOnline, dias }) {
+  const data = dias ?? PRONOSTICO;
   return (
     <div style={apScr.pronoWrap}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -132,7 +134,7 @@ function Pronostico({ online, onToggleOnline }) {
         </button>
       </div>
       <div style={apScr.pronoRow}>
-        {PRONOSTICO.map((d, i) => {
+        {data.map((d, i) => {
           const c = CLIMA_AP[d.cond];
           return (
             <div key={i} style={{ ...apScr.pronoDay, background: i === 0 ? "rgba(255,255,255,.14)" : "transparent" }}>
