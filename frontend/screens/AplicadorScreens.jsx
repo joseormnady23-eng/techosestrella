@@ -297,17 +297,44 @@ function ObraDetalleMobile({ obra, checkin, historial, online, onBack, onCheckin
 function CheckinScreen({ obra, online, onBack, onConfirm }) {
   const [fase, setFase] = useS("buscando"); // buscando | listo | hecho
   const [hora, setHora] = useS("");
+  const [coords, setCoords] = useS(null);   // { lat, lng } reales del GPS
+  const [geoErr, setGeoErr] = useS(false);
+
   useE(() => {
-    const t = setTimeout(() => setFase("listo"), 2300);
+    if (!navigator.geolocation) { setFase("listo"); return; }
+
+    let done = false;
+    const watchId = navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (done) return;
+        done = true;
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setFase("listo");
+      },
+      () => {
+        if (done) return;
+        done = true;
+        setGeoErr(true);
+        setFase("listo"); // permite check-in aunque no haya GPS
+      },
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+    // Fallback por si el dispositivo tarda demasiado
+    const t = setTimeout(() => { if (!done) { done = true; setFase("listo"); } }, 11000);
     return () => clearTimeout(t);
   }, []);
+
   function confirmar() {
-    const now = new Date();
-    const h = now.toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit", hour12: true });
+    const h = new Date().toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit", hour12: true });
     setHora(h);
     setFase("hecho");
-    onConfirm(h);
+    onConfirm(h, coords); // pasa las coords reales al orchestrador
   }
+
+  const coordLabel = coords
+    ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
+    : geoErr ? "GPS no disponible" : null;
+
   return (
     <div style={apScr.pushScreen} className="fade-in">
       <div style={apScr.detHeader}>
@@ -331,10 +358,15 @@ function CheckinScreen({ obra, online, onBack, onConfirm }) {
                 </div>
               ) : (
                 <div style={apScr.gpsOk}>
-                  <Icon name="checkcircle" size={20} color="var(--green)" /> Ubicación detectada — estás en la obra
+                  <Icon name="checkcircle" size={20} color="var(--green)" />
+                  <span>{geoErr ? "GPS no disponible — puedes hacer check-in igual" : "Ubicación detectada"}</span>
+                  {coordLabel && !geoErr && (
+                    <span className="mono" style={{ fontSize: 11.5, color: "var(--green-ink)", marginLeft: 8 }}>{coordLabel}</span>
+                  )}
                 </div>
               )}
-              <button disabled={fase !== "listo"} onClick={confirmar} style={{ ...apScr.action, background: fase === "listo" ? "var(--green)" : "var(--ink-300)", marginTop: 18, width: "100%" }}>
+              <button disabled={fase !== "listo"} onClick={confirmar}
+                style={{ ...apScr.action, background: fase === "listo" ? "var(--green)" : "var(--ink-300)", marginTop: 18, width: "100%" }}>
                 <Icon name="location" size={26} color="#fff" /> Confirmar check-in aquí
               </button>
             </>
@@ -342,7 +374,14 @@ function CheckinScreen({ obra, online, onBack, onConfirm }) {
             <div style={apScr.exito} className="fade-up">
               <span style={apScr.exitoIcon}><Icon name="check" size={56} color="#fff" stroke={2.4} /></span>
               <div style={{ fontSize: 24, fontWeight: 800, marginTop: 18 }}>¡Listo!</div>
-              <div style={{ fontSize: 17, color: "var(--ink-500)", marginTop: 8, lineHeight: 1.4 }}>Check-in registrado a las <strong className="tnum" style={{ color: "var(--ink-900)" }}>{hora}</strong></div>
+              <div style={{ fontSize: 17, color: "var(--ink-500)", marginTop: 8, lineHeight: 1.4 }}>
+                Check-in registrado a las <strong className="tnum" style={{ color: "var(--ink-900)" }}>{hora}</strong>
+              </div>
+              {coords && (
+                <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 6 }} className="mono">
+                  {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                </div>
+              )}
               {!online && <div style={{ ...apScr.offNote, marginTop: 18 }}><Icon name="alert" size={15} color="var(--amber-ink)" /> Guardado en el teléfono — subirá solo cuando regrese el internet.</div>}
               <button onClick={onBack} style={{ ...apScr.action, background: "var(--ink-900)", marginTop: 24, width: "100%" }}>Volver a la obra</button>
             </div>

@@ -37,9 +37,10 @@ function AplicadorMobile({ onKlika, setRole }) {
   const yo = rh.empleado(yoUser?.id) ?? rh.empleado("U-4") ?? rh.empleados[0];
   const yoNombre = yoUser?.nombre ?? yo?.nombre ?? "Aplicador";
 
-  // Datos cargados del backend
+  // Datos cargados del backend / GPS
   const [obrasData, setObrasData] = useStateAp(null);
   const [pronoData, setPronoData] = useStateAp(null);
+  const [geoPos, setGeoPos] = useStateAp(null); // { lat, lng } del aplicador
 
   // Navegación: tab base + pantalla push encima
   const [tab, setTabRaw] = useStateAp("obras"); // obras | foto | perfil
@@ -54,10 +55,9 @@ function AplicadorMobile({ onKlika, setRole }) {
   const [ausOpen, setAusOpen] = useStateAp(false);
   const [scanOpen, setScanOpen] = useStateAp(false);
 
-  // ---- Carga inicial ----
+  // ---- Carga inicial: obras del backend ----
   useEffectAp(() => {
     if (!window.KlikaData || !KlikaData.conectado()) return;
-
     KlikaData.obras.lista({ per_page: 20 }).then((res) => {
       const arr = (res.data ?? res)
         .filter((o) => ["proceso", "aprobada", "en_proceso"].includes(o.estado))
@@ -72,31 +72,47 @@ function AplicadorMobile({ onKlika, setRole }) {
           mapa: o.ubicacion_visible !== false,
           secciones: o.secciones?.length ? o.secciones : [{ m2: o.m2_total ?? 120, manos: 2 }],
         }));
-      if (arr.length) {
-        setObrasData(arr);
-        // Cargar clima de la primera obra para el pronóstico
-        KlikaData.obras.clima(arr[0]._id).then((cr) => {
-          // ClimaController devuelve un array directo de ClimaDia
-          const dias = Array.isArray(cr) ? cr : (cr.data ?? []);
-          if (dias.length) {
-            setPronoData(dias.slice(0, 7).map((d, i) => {
-              // ClimaDia.estado: "apto" | "precaucion" | "bloqueado"
-              const cond = d.estado === "bloqueado" ? "bad" : d.estado === "precaucion" ? "warn" : "ok";
+      if (arr.length) setObrasData(arr);
+    }).catch(() => {});
+  }, []);
+
+  // ---- GPS + pronóstico Open-Meteo directo (misma fuente que el backend) ----
+  useEffectAp(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setGeoPos({ lat, lng });
+        // Open-Meteo es gratuito, sin key, permite CORS desde el browser
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+          + `&daily=precipitation_probability_max,precipitation_sum`
+          + `&timezone=America%2FSanto_Domingo&forecast_days=7`;
+        fetch(url)
+          .then((r) => r.ok ? r.json() : Promise.reject())
+          .then((json) => {
+            const fechas = json.daily?.time ?? [];
+            const probs  = json.daily?.precipitation_probability_max ?? [];
+            if (!fechas.length) return;
+            setPronoData(fechas.slice(0, 7).map((fecha, i) => {
+              const prob = Number(probs[i] ?? 0);
+              // Mismos umbrales que ClimaService (apto <40, precaucion <=70, bloqueado >70)
+              const cond = prob > 70 ? "bad" : prob >= 40 ? "warn" : "ok";
               const icon = cond === "bad" ? "rain" : cond === "warn" ? "cloud" : "sun";
-              const prob = Number(d.prob_lluvia ?? 0);
-              // Nombre del día desde la fecha ISO del registro
               let dia = "Hoy";
-              if (i > 0 && d.fecha) {
-                const f = new Date(d.fecha + "T12:00:00");
+              if (i > 0) {
+                const f = new Date(fecha + "T12:00:00");
                 dia = f.toLocaleDateString("es-DO", { weekday: "short" });
                 dia = dia.charAt(0).toUpperCase() + dia.slice(1, 3);
               }
               return { dia, icon, prob, cond };
             }));
-          }
-        }).catch(() => {});
-      }
-    }).catch(() => {});
+          })
+          .catch(() => {});
+      },
+      () => {}, // permiso denegado — el mock PRONOSTICO cubre el fallback
+      { timeout: 8000, maximumAge: 300000, enableHighAccuracy: false }
+    );
   }, []);
 
   const misObras = obrasData ?? OBRAS.filter((o) => o.cuadrilla === "CU-1" && ["proceso", "aprobada"].includes(o.estado));
@@ -111,11 +127,15 @@ function AplicadorMobile({ onKlika, setRole }) {
 
   function abrirObra(obra) { setObraAbierta(obra); setScreen("obraDetalle"); }
 
-  function confirmarCheckin(hora) {
+  function confirmarCheckin(hora, coords) {
     if (!obraAbierta) return;
     setCheckins((c) => ({ ...c, [obraAbierta.id]: { entrada: hora, salida: null } }));
     if (window.KlikaData && KlikaData.conectado()) {
-      KlikaData.asistencias.checkin({ obra_id: obraAbierta._id ?? obraAbierta.id })
+      KlikaData.asistencias.checkin({
+        obra_id: obraAbierta._id ?? obraAbierta.id,
+        lat: coords?.lat ?? geoPos?.lat ?? null,
+        lng: coords?.lng ?? geoPos?.lng ?? null,
+      })
         .then((r) => { if (r?.id) setAsistIds((m) => ({ ...m, [obraAbierta.id]: r.id })); })
         .catch(() => {});
     }
