@@ -4,6 +4,7 @@ FROM php:8.4-fpm-alpine
 # Dependencias de sistema + extensiones PHP (pdo_mysql, gd para PDFs, zip, bcmath…)
 RUN apk add --no-cache \
         libpng-dev libjpeg-turbo-dev freetype-dev libzip-dev oniguruma-dev icu-dev \
+        git unzip \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring bcmath gd zip exif pcntl intl \
@@ -16,7 +17,9 @@ WORKDIR /var/www/html
 
 # Instala dependencias primero (mejor cacheo de capas)
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --prefer-dist
+RUN composer config --global github-protocols https \
+    && composer install --no-dev --no-scripts --no-autoloader --no-interaction \
+       --prefer-dist --ignore-platform-req=ext-sodium
 
 # Copia el resto del código y finaliza la instalación
 COPY . .
