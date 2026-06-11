@@ -9,7 +9,9 @@
   const LS_TOKEN = "klika_campo_token";
   const LS_USER = "klika_campo_user";
   const LS_QUEUE = "klika_campo_queue";
-  const DEFAULT_BASE = "http://127.0.0.1:8000/api";
+  const DEFAULT_BASE = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:8000/api"
+    : "/api";
 
   const base = () => localStorage.getItem(LS_BASE) || DEFAULT_BASE;
   const token = () => localStorage.getItem(LS_TOKEN);

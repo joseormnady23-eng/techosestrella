@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portal de Cliente · Techos Estrella</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #1E7FC2; --blue-dark: #1565A0;
+    --green: #22883a; --green-bg: #edfbf1; --green-ink: #1a6b2e;
+    --amber-bg: #fff8e1; --amber-ink: #7a5800;
+    --red: #d32f2f; --red-bg: #fff0f0; --red-ink: #b71c1c;
+    --ink-900: #0f1013; --ink-700: #2a2d35; --ink-500: #5a606e;
+    --ink-400: #7a8190; --ink-300: #9aa1ac; --ink-100: #e8eaed;
+    --surface: #ffffff; --surface-2: #f5f7fa;
+  }
+  body { font-family: 'Figtree', sans-serif; background: #f0f4f8; min-height: 100vh; }
+  #app { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 0 0 40px; }
+
+  /* Header de marca */
+  .brand-bar { width: 100%; background: var(--blue); color: #fff; padding: 14px 20px;
+    display: flex; align-items: center; gap: 12px; }
+  .brand-bar svg { flex-shrink: 0; }
+  .brand-bar .name { font-weight: 900; font-size: 17px; letter-spacing: -.3px; }
+  .brand-bar .sub  { font-size: 12px; opacity: .75; }
+
+  /* Tarjeta centrada */
+  .card-wrap { width: 100%; max-width: 440px; margin-top: 20px; padding: 0 16px; }
+  .card { background: var(--surface); border-radius: 18px; padding: 24px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.07); margin-bottom: 14px; }
+
+  /* Obra header */
+  .obra-title { font-size: 20px; font-weight: 900; color: var(--ink-900); }
+  .obra-meta  { font-size: 13px; color: var(--ink-400); margin-top: 3px; font-family: monospace; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--ink-100); margin: 0 -24px; padding: 0 24px; }
+  .tab  { flex: 1; padding: 12px 0; border: none; background: transparent; font-family: inherit;
+    font-size: 14px; font-weight: 600; color: var(--ink-400); border-bottom: 2.5px solid transparent;
+    margin-bottom: -1px; cursor: pointer; }
+  .tab.on { color: var(--ink-900); border-color: var(--blue); }
+
+  /* Ítems cotización */
+  .item { border: 1px solid var(--ink-100); border-radius: 12px; padding: 14px; margin: 14px 0 0; }
+  .item-title { font-weight: 700; font-size: 15px; }
+  .item-desc  { font-size: 13px; color: var(--ink-500); margin-top: 3px; }
+  .item-total { font-size: 17px; font-weight: 800; color: var(--blue); margin-top: 10px; }
+
+  .total-box { background: var(--ink-900); color: #fff; border-radius: 14px; padding: 16px 18px;
+    display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .total-box .lbl { font-size: 13px; opacity: .75; }
+  .total-box .val { font-size: 22px; font-weight: 900; }
+
+  /* Botones acción */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border-radius: 10px; font-family: inherit; font-size: 14.5px; font-weight: 700;
+    cursor: pointer; padding: 0 18px; height: 46px; border: none; transition: opacity .15s; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn-primary { background: var(--blue); color: #fff; width: 100%; margin-top: 12px; height: 50px; font-size: 15.5px; }
+  .btn-ghost   { background: transparent; border: 1.5px solid var(--ink-200,#d0d5dd); color: var(--ink-700); }
+  .btn-approve { background: var(--green-bg); border: 1.5px solid var(--green); color: var(--green-ink); width: 100%; margin-top: 10px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  /* Banner estado */
+  .status-banner { border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 600;
+    line-height: 1.4; margin-bottom: 14px; }
+  .status-ok   { background: var(--green-bg); color: var(--green-ink); }
+  .status-warn { background: var(--amber-bg); color: var(--amber-ink); }
+  .status-bad  { background: var(--red-bg);   color: var(--red-ink); }
+
+  /* Progreso */
+  .progress-bar { height: 10px; background: var(--ink-100); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #1E7FC2, #1565A0); }
+
+  /* Fotos grid */
+  .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .photo  { border-radius: 12px; overflow: hidden; border: 1px solid var(--ink-100); aspect-ratio: 4/3; position: relative; background: var(--surface-2); }
+  .photo img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-lbl { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700;
+    color: #fff; background: rgba(0,0,0,.45); padding: 3px 9px; border-radius: 99px; }
+
+  /* Garantía */
+  .warranty { display: flex; align-items: center; gap: 12px; padding: 14px;
+    background: var(--green-bg); border-radius: 14px; margin-top: 14px; }
+  .warranty-ico { font-size: 26px; }
+  .warranty-ttl { font-weight: 700; font-size: 14px; }
+  .warranty-sub { font-size: 12.5px; color: var(--ink-500); }
+
+  /* Contacto */
+  .contact { display: flex; align-items: center; justify-content: space-between;
+    margin-top: 16px; padding: 12px 14px; background: #e8f4fd; border-radius: 12px; }
+  .contact span { font-size: 13px; color: var(--ink-500); }
+  .btn-wa { background: #25D366; color: #fff; border-radius: 8px; padding: 0 14px; height: 38px; font-size: 13.5px; }
+
+  /* Error / spinner */
+  .spin { width: 40px; height: 40px; border: 3px solid var(--ink-100);
+    border-top-color: var(--blue); border-radius: 50%; animation: sp .7s linear infinite; margin: 60px auto; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .err { text-align: center; padding: 40px 20px; color: var(--ink-400); font-size: 15px; }
+
+  /* Footer */
+  .footer { font-size: 12px; color: var(--ink-400); text-align: center; margin-top: 10px; padding: 0 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="brand-bar">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="white" fill-opacity=".15"/>
+      <polygon points="16,4 19.5,13 29,13 21.5,18.5 24,28 16,22.5 8,28 10.5,18.5 3,13 12.5,13" fill="white"/>
+    </svg>
+    <div>
+      <div class="name">Techos Estrella</div>
+      <div class="sub">Portal del cliente</div>
+    </div>
+  </div>
+  <div class="card-wrap" id="root"><div class="spin"></div></div>
+  <div class="footer">Techos Estrella SRL · Santiago, R.D.</div>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById("root");
+  const params = new URLSearchParams(location.search);
+  const obraId = params.get("obra");
+
+  if (!obraId) {
+    root.innerHTML = '<div class="err">Enlace inválido.<br><small>Solicita el enlace correcto a Techos Estrella.</small></div>';
+    return;
+  }
+
+  const API_BASE = "/api";
+  const fmt = (n) => new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP", minimumFractionDigits: 0 }).format(n || 0);
+  let estado = null; // null | "aprobada" | "cambios" | "rechazada"
+  let cotiz = null;
+  let fotos = [];
+  let tab = "cotizacion";
+
+  async function get(path) {
+    const res = await fetch(API_BASE + path, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  async function load() {
+    try {
+      const [cotRes, fotosRes] = await Promise.all([
+        get("/cotizaciones?obra_id=" + obraId + "&per_page=1"),
+        get("/obras/" + obraId + "/fotos"),
+      ]);
+      const arr = cotRes.data ?? cotRes;
+      cotiz = Array.isArray(arr) ? arr[0] : arr;
+      fotos = (fotosRes.data ?? fotosRes).filter((f) => f.visible_cliente);
+    } catch (e) {
+      // Intenta solo con obra si la cotización falla
+      try { cotiz = null; } catch {}
+    }
+    render();
+  }
+
+  function render() {
+    if (!cotiz) {
+      root.innerHTML = '<div class="err">No se encontró información de tu obra.<br><small>Contacta a Techos Estrella.</small></div>';
+      return;
+    }
+    const clienteNom = cotiz.cliente?.nombre ?? cotiz.obra?.cliente?.nombre ?? "Cliente";
+    const obraNom = cotiz.obra?.titulo ?? "Tu obra";
+    const obraCod = cotiz.obra?.codigo ?? ("OB-" + obraId);
+    const validaHasta = cotiz.valido_hasta
+      ? cotiz.valido_hasta
+      : cotiz.created_at
+        ? new Date(new Date(cotiz.created_at).getTime() + 30 * 864e5).toLocaleDateString("es-DO", { day: "numeric", month: "short", year: "numeric" })
+        : "—";
+    const items = cotiz.items?.length ? cotiz.items : [];
+    const total = Number(cotiz.total_con_itbis ?? cotiz.total ?? 0);
+    const progreso = cotiz.obra?.avance_pct ?? 0;
+
+    const bannerHtml = estado ? `<div class="status-banner ${estado === "rechazada" ? "status-bad" : estado === "cambios" ? "status-warn" : "status-ok"}">
+      ${estado === "aprobada" ? "✅ ¡Aprobaste la propuesta! Techos Estrella te contactará pronto." : ""}
+      ${estado === "cambios" ? "✏️ Pediste cambios. Techos Estrella revisará y te responderá." : ""}
+      ${estado === "rechazada" ? "❌ Rechazaste la propuesta." : ""}
+    </div>` : "";
+
+    const cotizHtml = `
+      ${bannerHtml}
+      ${items.map((it, i) => `<div class="item">
+        <div class="item-title">${esc(it.descripcion ?? it.material?.nombre ?? "Ítem " + (i+1))}</div>
+        <div class="item-desc">${it.area_m2 ? it.area_m2 + " m²" : ""} ${it.manos ? "· " + it.manos + " mano(s)" : ""}</div>
+        <div class="item-total">${fmt(it.total_con_itbis ?? it.total)}</div>
+      </div>`).join("")}
+      <div class="total-box"><span class="lbl">Total propuesta completa</span><span class="val">${fmt(total)}</span></div>
+      <button class="btn btn-primary" onclick="setEstado('aprobada')">✅ Aprobar propuesta</button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="setEstado('cambios')">✏️ Pedir cambios</button>
+        <button class="btn btn-ghost" style="color:var(--red)" onclick="setEstado('rechazada')">✖ Rechazar</button>
+      </div>
+      <div class="contact">
+        <span>¿Dudas? Escríbenos</span>
+        <a href="https://wa.me/18095550001" target="_blank" class="btn btn-wa">💬 WhatsApp</a>
+      </div>`;
+
+    const fotosHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:700">Tu obra va al ${progreso}%</span>
+        <span style="color:var(--ink-400);font-size:13px">en proceso</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progreso}%"></div></div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-400);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px">Fotos de avance</div>
+      <div class="photos">
+        ${fotos.length ? fotos.map((f) => `<div class="photo"><img src="${esc(f.url)}" alt="${esc(f.tipo)}"><span class="photo-lbl">${esc(f.tipo)}</span></div>`).join("")
+          : '<div class="err" style="grid-column:1/-1;padding:20px">Aún no hay fotos marcadas como visibles.</div>'}
+      </div>
+      <div class="warranty">
+        <div class="warranty-ico">🛡️</div>
+        <div><div class="warranty-ttl">Garantía de 7 años</div><div class="warranty-sub">Se activa al terminar la obra</div></div>
+      </div>`;
+
+    root.innerHTML = `<div class="card">
+      <div class="obra-title">${esc(clienteNom)} · ${esc(obraNom)}</div>
+      <div class="obra-meta">${esc(obraCod)} · válida hasta ${esc(validaHasta)}</div>
+      <div class="tabs" style="margin-top:16px">
+        <button class="tab ${tab === "cotizacion" ? "on" : ""}" onclick="setTab('cotizacion')">Cotización</button>
+        <button class="tab ${tab === "avance" ? "on" : ""}" onclick="setTab('avance')">Avance de obra</button>
+      </div>
+      <div style="padding-top:16px">${tab === "cotizacion" ? cotizHtml : fotosHtml}</div>
+    </div>`;
+  }
+
+  function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  window.setTab = (t) => { tab = t; render(); };
+  window.setEstado = (e) => { estado = e; render(); };
+
+  load();
+})();
+</script>
+</body>
+</html>

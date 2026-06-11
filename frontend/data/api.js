@@ -9,7 +9,9 @@
   const LS_TOKEN = "klika_token";
   const LS_USER = "klika_usuario";
 
-  const DEFAULT_BASE = "http://127.0.0.1:8000/api";
+  const DEFAULT_BASE = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:8000/api"
+    : "/api";
 
   function base() {
     return localStorage.getItem(LS_BASE) || DEFAULT_BASE;
