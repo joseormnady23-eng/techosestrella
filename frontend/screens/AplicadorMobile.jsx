@@ -76,13 +76,22 @@ function AplicadorMobile({ onKlika, setRole }) {
         setObrasData(arr);
         // Cargar clima de la primera obra para el pronóstico
         KlikaData.obras.clima(arr[0]._id).then((cr) => {
-          const dias = (cr.data ?? cr).dias ?? cr;
-          if (Array.isArray(dias) && dias.length) {
-            const DIAS_NAMES = ["Hoy", "Mié", "Jue", "Vie", "Sáb", "Dom", "Lun"];
+          // ClimaController devuelve un array directo de ClimaDia
+          const dias = Array.isArray(cr) ? cr : (cr.data ?? []);
+          if (dias.length) {
             setPronoData(dias.slice(0, 7).map((d, i) => {
-              const prob = Number(d.prob_lluvia ?? d.precipitacion ?? 0);
-              const cond = d.bloqueado ? "bad" : d.apto === false ? "warn" : prob >= 80 ? "bad" : prob >= 40 ? "warn" : "ok";
-              return { dia: DIAS_NAMES[i] ?? `D${i + 1}`, icon: cond === "bad" ? "rain" : cond === "warn" ? "cloud" : "sun", prob, cond };
+              // ClimaDia.estado: "apto" | "precaucion" | "bloqueado"
+              const cond = d.estado === "bloqueado" ? "bad" : d.estado === "precaucion" ? "warn" : "ok";
+              const icon = cond === "bad" ? "rain" : cond === "warn" ? "cloud" : "sun";
+              const prob = Number(d.prob_lluvia ?? 0);
+              // Nombre del día desde la fecha ISO del registro
+              let dia = "Hoy";
+              if (i > 0 && d.fecha) {
+                const f = new Date(d.fecha + "T12:00:00");
+                dia = f.toLocaleDateString("es-DO", { weekday: "short" });
+                dia = dia.charAt(0).toUpperCase() + dia.slice(1, 3);
+              }
+              return { dia, icon, prob, cond };
             }));
           }
         }).catch(() => {});
