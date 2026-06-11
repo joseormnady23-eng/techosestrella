@@ -18,8 +18,8 @@ WORKDIR /var/www/html
 # Instala dependencias primero (mejor cacheo de capas)
 COPY composer.json composer.lock ./
 RUN composer config --global github-protocols https \
-    && composer install --no-dev --no-scripts --no-autoloader --no-interaction \
-       --prefer-dist --ignore-platform-req=ext-sodium
+    && COMPOSER_PROCESS_TIMEOUT=600 composer install \
+       --no-dev --no-scripts --no-autoloader --no-interaction --prefer-source
 
 # Copia el resto del código y finaliza la instalación
 COPY . .
