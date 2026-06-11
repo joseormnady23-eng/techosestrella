@@ -1,5 +1,5 @@
 # Klika backend · imagen PHP-FPM para producción (Unraid/Docker)
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Dependencias de sistema + extensiones PHP (pdo_mysql, gd para PDFs, zip, bcmath…)
 RUN apk add --no-cache \
