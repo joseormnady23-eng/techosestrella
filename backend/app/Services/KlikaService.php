@@ -38,35 +38,43 @@ class KlikaService
     public function generarConContexto(string $prompt, Usuario $user): array
     {
         $contexto = $this->buildContexto($user);
+        $sistema = $this->promptSistema($user->rol);
 
-        // El contexto va en el prompt del usuario, no solo en el system prompt.
-        // Los modelos prestan mucho más atención a los datos en el turno de usuario.
-        $promptConContexto = "INFORMACIÓN ACTUAL DEL NEGOCIO (úsala para responder):\n{$contexto}\n\nPREGUNTA: {$prompt}";
+        // Usamos /api/chat con un turno de "priming": el modelo recibe los datos
+        // como mensaje de usuario y confirma que los vio antes de responder la pregunta real.
+        // Esto es mucho más fiable que inyectar en el system prompt.
+        $messages = [
+            ['role' => 'system',    'content' => $sistema],
+            ['role' => 'user',      'content' => "Estos son los datos actuales del negocio:\n\n{$contexto}"],
+            ['role' => 'assistant', 'content' => "Entendido. Ya tengo toda la información actual del negocio."],
+            ['role' => 'user',      'content' => $prompt],
+        ];
 
-        return $this->generar($promptConContexto, $this->promptSistema($user->rol));
+        return $this->chat($messages);
     }
 
     /**
-     * Envía un prompt a Klika y devuelve la respuesta.
+     * Llama a /api/chat de Ollama con un array de mensajes.
      *
+     * @param  array<array{role: string, content: string}>  $messages
      * @return array{ok: bool, respuesta: string, modelo: string}
      */
-    public function generar(string $prompt, ?string $sistema = null): array
+    public function chat(array $messages): array
     {
         try {
             $resp = Http::timeout($this->timeout)
-                ->post("{$this->baseUrl}/api/generate", [
-                    'model' => $this->modelo,
-                    'prompt' => $prompt,
-                    'system' => $sistema ?? $this->promptSistema(),
-                    'stream' => false,
+                ->post("{$this->baseUrl}/api/chat", [
+                    'model'    => $this->modelo,
+                    'messages' => $messages,
+                    'stream'   => false,
                 ]);
 
             if ($resp->ok()) {
+                $content = $resp->json('message.content', '');
                 return [
-                    'ok' => true,
-                    'respuesta' => trim($resp->json('response', '')),
-                    'modelo' => $this->modelo,
+                    'ok'        => true,
+                    'respuesta' => trim($content),
+                    'modelo'    => $this->modelo,
                 ];
             }
 
@@ -76,10 +84,23 @@ class KlikaService
         }
 
         return [
-            'ok' => false,
-            'respuesta' => 'Klika no está disponible en este momento (no pude conectar con el servidor de IA). Intenta de nuevo en un momento.',
-            'modelo' => $this->modelo,
+            'ok'        => false,
+            'respuesta' => 'Klika no está disponible en este momento. Intenta de nuevo en un momento.',
+            'modelo'    => $this->modelo,
         ];
+    }
+
+    /**
+     * Envía un prompt simple a Klika (sin contexto de BD).
+     *
+     * @return array{ok: bool, respuesta: string, modelo: string}
+     */
+    public function generar(string $prompt, ?string $sistema = null): array
+    {
+        return $this->chat([
+            ['role' => 'system', 'content' => $sistema ?? $this->promptSistema()],
+            ['role' => 'user',   'content' => $prompt],
+        ]);
     }
 
     /**
