@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\PortalController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\SolicitudCambioController;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\Api\UbicacionConductorController;
 use App\Http\Controllers\Api\VehiculoController;
 use Illuminate\Support\Facades\Route;
 
@@ -121,7 +122,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('vehiculos', [VehiculoController::class, 'store']);
         Route::match(['put', 'patch'], 'vehiculos/{vehiculo}', [VehiculoController::class, 'update']);
         Route::patch('vehiculos/{vehiculo}/asignar', [VehiculoController::class, 'asignar']);
+        // Mapa de flota — ver ubicaciones en tiempo real
+        Route::get('vehiculos/ubicaciones', [UbicacionConductorController::class, 'index']);
     });
+
+    // GPS del conductor — cualquier rol autenticado puede enviar su posición
+    Route::post('mi/ubicacion', [UbicacionConductorController::class, 'ping']);
+    Route::post('mi/ubicacion/desactivar', [UbicacionConductorController::class, 'desactivar']);
 
     // Planificador / días de obra.
     Route::get('obra-dias', [ObraDiaController::class, 'index']);

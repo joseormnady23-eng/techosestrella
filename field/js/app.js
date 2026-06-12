@@ -101,6 +101,7 @@
           await API.logout();
           throw Object.assign(new Error("Esta app es solo para aplicadores."), { status: 403 });
         }
+        document.dispatchEvent(new Event("klika:login"));
         render();
       } catch (e) {
         document.getElementById("login-err").innerHTML = `<div class="err">${esc(e.message || "No se pudo entrar")}</div>`;
@@ -417,7 +418,7 @@
       actualizarBadgeSync();
     };
     scr.querySelector("#guardar-api").onclick = () => { API.setBase(scr.querySelector("#api-base").value.trim()); toast("Servidor guardado"); };
-    scr.querySelector("#logout").onclick = async () => { await API.logout(); render(); };
+    scr.querySelector("#logout").onclick = async () => { document.dispatchEvent(new Event("klika:logout")); await API.logout(); render(); };
   }
 
   function errorBox(e) {
@@ -427,6 +428,31 @@
   // ---- Conexión / sincronización automática ----
   window.addEventListener("online", () => { setOnline(); API.sincronizar().then((n) => { if (n) toast(`✅ ${n} acciones sincronizadas`); actualizarBadgeSync(); }); });
   window.addEventListener("offline", setOnline);
+
+  // ---- GPS tracking — envía posición cada 30s cuando está autenticado ----
+  let _gpsInterval = null;
+  function iniciarGPS() {
+    if (_gpsInterval || !("geolocation" in navigator)) return;
+    function enviar() {
+      if (!API.autenticado() || !navigator.onLine) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => API.pingUbicacion(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+        () => {}
+      );
+    }
+    enviar();
+    _gpsInterval = setInterval(enviar, 30000);
+  }
+  function detenerGPS() {
+    if (_gpsInterval) { clearInterval(_gpsInterval); _gpsInterval = null; }
+    API.desactivarUbicacion();
+  }
+
+  // Iniciar GPS al cargar si ya está autenticado, detener al cerrar sesión
+  if (API.autenticado()) iniciarGPS();
+  document.addEventListener("klika:login", iniciarGPS);
+  document.addEventListener("klika:logout", detenerGPS);
+  window.addEventListener("beforeunload", () => { if (API.autenticado()) API.desactivarUbicacion(); });
 
   // ---- Service worker ----
   if ("serviceWorker" in navigator) {

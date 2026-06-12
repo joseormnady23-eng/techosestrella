@@ -146,6 +146,12 @@
       }
     },
 
+    // GPS
+    pingUbicacion: (lat, lng, precision) =>
+      request("POST", "/mi/ubicacion", { latitud: lat, longitud: lng, precision_m: Math.round(precision || 0) }).catch(() => {}),
+    desactivarUbicacion: () =>
+      request("POST", "/mi/ubicacion/desactivar").catch(() => {}),
+
     // Sincronización
     pendientes() { return getQueue().length; },
     async pendientesFotos() { return (await fotoAll()).length; },

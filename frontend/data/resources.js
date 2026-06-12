@@ -186,6 +186,7 @@
       crear: (data) => api.post("/vehiculos", data),
       actualizar: (id, data) => api.put(`/vehiculos/${id}`, data),
       asignar: (id, cuadrillaId) => api.patch(`/vehiculos/${id}/asignar`, { cuadrilla_id: cuadrillaId }),
+      ubicaciones: () => api.get("/vehiculos/ubicaciones"),
     },
 
     // --- Planificador / clima ---

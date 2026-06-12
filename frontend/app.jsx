@@ -1,6 +1,6 @@
 /* global React, ReactDOM, Login, Dashboard, Sidebar, Topbar, NAV_META, ROLES, OBRAS,
    ObrasList, ObraDetalle, Cotizacion, Planificador, Inventario, Cuadrillas, Clientes,
-   Reportes, AplicadorMobile, KlikaPanel, PortalCliente, Vehiculos, Usuarios, Asistencias, Icon,
+   Reportes, AplicadorMobile, KlikaPanel, MapaFlota, PortalCliente, Vehiculos, Usuarios, Asistencias, Icon,
    Facturas, Gastos, ReportesDGII, SecuenciasNCF, RecursosHumanos */
 // ============================================================
 //  Klika · App principal (router por estado)
@@ -46,6 +46,7 @@ function App() {
   const [obraId, setObraId] = useState(null);
   const [obraTab, setObraTab] = useState("resumen");
   const [klikaOpen, setKlikaOpen] = useState(false);
+  const [mapaOpen, setMapaOpen] = useState(false);
   const [portalOpen, setPortalOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
@@ -115,7 +116,11 @@ function App() {
   const headTitle = screen === "obra" && obra ? obra.titulo : (screen === "obra" && obraId ? "Cargando obra…" : tTitle);
   const headSub = screen === "obra" && obra ? `${obra.id} · ${obra.clienteNom}` : tSub;
 
-  const actions = null;
+  const actions = (role === "dueno" || role === "supervisor") ? (
+    <button onClick={() => setMapaOpen(true)} className="btn btn-icon btn-soft" title="Mapa de flota">
+      <Icon name="map-pin" size={19} />
+    </button>
+  ) : null;
 
   return (
     <div style={app.shell}>
@@ -130,6 +135,7 @@ function App() {
       </div>
 
       {klikaOpen && <KlikaPanel onClose={() => setKlikaOpen(false)} onNav={nav} />}
+      {mapaOpen && <MapaFlota onClose={() => setMapaOpen(false)} />}
       {portalOpen && <PortalCliente onClose={() => setPortalOpen(false)} obraId={obraId} />}
     </div>
   );
