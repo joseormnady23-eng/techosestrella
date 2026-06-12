@@ -2,7 +2,20 @@
 // ============================================================
 //  Shell · barra lateral + topbar + selector de rol
 // ============================================================
-const { useState } = React;
+const { useState, useEffect: useEffectShell } = React;
+
+// Captura el evento de instalación PWA globalmente
+let _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  // Notifica a los componentes montados
+  window.dispatchEvent(new Event('pwa-installable'));
+});
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  window.dispatchEvent(new Event('pwa-installed'));
+});
 
 function Sidebar({ role, screen, onNav, onKlika, open }) {
   const nav = ROLES[role].nav.filter((k) => k !== "klika");
@@ -46,6 +59,25 @@ function Sidebar({ role, screen, onNav, onKlika, open }) {
 function Topbar({ role, setRole, title, sub, onKlika, actions, onMenu }) {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [canInstall, setCanInstall] = useState(!!_pwaPrompt);
+
+  useEffectShell(() => {
+    const onInstallable = () => setCanInstall(true);
+    const onInstalled   = () => setCanInstall(false);
+    window.addEventListener('pwa-installable', onInstallable);
+    window.addEventListener('pwa-installed',   onInstalled);
+    return () => {
+      window.removeEventListener('pwa-installable', onInstallable);
+      window.removeEventListener('pwa-installed',   onInstalled);
+    };
+  }, []);
+
+  async function instalarApp() {
+    if (!_pwaPrompt) return;
+    _pwaPrompt.prompt();
+    const { outcome } = await _pwaPrompt.userChoice;
+    if (outcome === 'accepted') { _pwaPrompt = null; setCanInstall(false); }
+  }
   const store = useKlikaStore();
   const notifs = store.notifsDe(role);
   const noLeidas = store.noLeidasDe(role);
@@ -76,6 +108,17 @@ function Topbar({ role, setRole, title, sub, onKlika, actions, onMenu }) {
         </div>
 
         {actions}
+
+        {canInstall && (
+          <button onClick={instalarApp} className="btn btn-soft r-install-btn"
+            title="Instalar como app en este dispositivo"
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700,
+              padding: "0 12px", height: 36, borderRadius: 10, whiteSpace: "nowrap",
+              background: "var(--blue-50)", color: "var(--blue-600)", border: "1.5px solid var(--blue-100)" }}>
+            <Icon name="download" size={16} color="var(--blue-600)" />
+            <span className="r-install-label">Instalar app</span>
+          </button>
+        )}
 
         <div style={{ position: "relative" }}>
           <button className="btn btn-icon btn-ghost" title="Notificaciones" style={{ position: "relative" }} onClick={toggleNotifs}>
