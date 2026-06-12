@@ -39,6 +39,18 @@ function Placeholder({ title }) {
   );
 }
 
+function Proximamente({ title, desc }) {
+  return (
+    <div style={{ padding: 60, maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>🚧</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--ink-800)", marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 14, color: "var(--ink-400)", lineHeight: 1.6 }}>
+        {desc || "Esta sección está en desarrollo. Estará disponible próximamente."}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [view, setView] = useState("login");      // login | app
   const [role, setRole] = useState("dueno");
@@ -97,8 +109,8 @@ function App() {
     case "cotizacion":  content = <Cotizacion onNav={nav} role={role} onPortal={() => setPortalOpen(true)} />; break;
     case "facturas":    content = <Facturas role={role} />; break;
     case "gastos":      content = <Gastos role={role} />; break;
-    case "dgii":        content = <ReportesDGII role={role} />; break;
-    case "ncf":         content = <SecuenciasNCF role={role} />; break;
+    case "dgii":        content = <Proximamente title="Reportes DGII" desc="Los formatos 606 y 607 estarán disponibles cuando se active la integración con la DGII." />; break;
+    case "ncf":         content = <Proximamente title="Secuencias NCF" desc="La gestión de comprobantes fiscales estará disponible cuando se active la integración contable." />; break;
     case "planificador":content = <Planificador onNav={nav} onKlika={() => setKlikaOpen(true)} role={role} />; break;
     case "inventario":  content = <Inventario role={role} />; break;
     case "rrhh":        content = <RecursosHumanos role={role} />; break;
