@@ -116,10 +116,6 @@ function Login({ onEnter }) {
             </button>
           </div>
 
-          <div style={lg.hint}>
-            <Icon name="sparkle" size={14} color="var(--blue-600)" />
-            <span>Backend: <b>8091110001</b> / <b>Klika2024!</b> (dueño). Si el servidor no está corriendo, deja los campos vacíos y pulsa Entrar para el modo demo.</span>
-          </div>
         </div>
       </div>
     </div>
