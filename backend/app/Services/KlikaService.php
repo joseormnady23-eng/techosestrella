@@ -2,6 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\ClimaDia;
+use App\Models\Cotizacion;
+use App\Models\Cuadrilla;
+use App\Models\Factura;
+use App\Models\Gasto;
+use App\Models\Material;
+use App\Models\Obra;
+use App\Models\Usuario;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -20,6 +28,18 @@ class KlikaService
         $this->baseUrl = rtrim(config('services.ollama.url', env('KLIKA_OLLAMA_URL', 'http://10.0.0.237:11434')), '/');
         $this->modelo = config('services.ollama.model', env('KLIKA_OLLAMA_MODEL', 'klika:latest'));
         $this->timeout = (int) config('services.ollama.timeout', env('KLIKA_OLLAMA_TIMEOUT', 120));
+    }
+
+    /**
+     * Genera una respuesta con contexto real de la base de datos según el rol del usuario.
+     *
+     * @return array{ok: bool, respuesta: string, modelo: string}
+     */
+    public function generarConContexto(string $prompt, Usuario $user): array
+    {
+        $contexto = $this->buildContexto($user);
+        $sistema = $this->promptSistema($user->rol) . "\n\n--- DATOS EN TIEMPO REAL ---\n" . $contexto;
+        return $this->generar($prompt, $sistema);
     }
 
     /**
@@ -70,10 +90,126 @@ class KlikaService
         }
     }
 
-    protected function promptSistema(): string
+    /**
+     * Construye el contexto de datos reales para inyectarlo en el prompt de sistema.
+     * El dueño recibe datos financieros; supervisor y dueño reciben info de cuadrillas.
+     */
+    protected function buildContexto(Usuario $user): string
     {
-        return 'Eres Klika, el asistente de IA del ERP de Techos Estrella SRL, una empresa '
-            .'dominicana de impermeabilización de techos. Ayudas con cotizaciones, reprogramaciones '
-            .'por clima, inventario y dudas sobre las obras. Responde en español dominicano, claro y directo.';
+        $partes = [];
+        $hoy = now()->toDateString();
+
+        // --- Obras en proceso (todos los roles) ---
+        $obras = Obra::with(['cliente', 'cuadrilla'])
+            ->where('estado', 'en_proceso')
+            ->orderBy('fecha_fin_estimada')
+            ->get();
+
+        if ($obras->isNotEmpty()) {
+            $partes[] = "OBRAS EN PROCESO ({$obras->count()}):";
+            foreach ($obras as $o) {
+                $fin = $o->fecha_fin_estimada ? $o->fecha_fin_estimada->format('d/m/Y') : 'sin fecha';
+                $partes[] = "- {$o->codigo}: {$o->titulo} · Cliente: {$o->cliente?->nombre} · Cuadrilla: {$o->cuadrilla?->nombre} · Fin estimado: {$fin}";
+            }
+        } else {
+            $partes[] = "OBRAS EN PROCESO: Ninguna actualmente.";
+        }
+
+        // --- Inventario bajo mínimo (todos) ---
+        $bajoMin = Material::bajoMinimo()->where('es_herramienta', false)->get();
+        if ($bajoMin->isNotEmpty()) {
+            $partes[] = "\nMATERIALES BAJO MÍNIMO ({$bajoMin->count()}):";
+            foreach ($bajoMin as $m) {
+                $partes[] = "- {$m->nombre}: {$m->stock_actual} / mínimo {$m->stock_minimo} {$m->unidad}";
+            }
+        } else {
+            $partes[] = "\nINVENTARIO: Todos los materiales están sobre el mínimo.";
+        }
+
+        // --- Clima próximos 7 días (todos) ---
+        $clima = ClimaDia::where('fecha', '>=', $hoy)
+            ->orderBy('fecha')
+            ->limit(7)
+            ->get();
+
+        if ($clima->isNotEmpty()) {
+            $partes[] = "\nCLIMA PRÓXIMOS DÍAS:";
+            foreach ($clima as $c) {
+                $fecha = $c->fecha->format('d/m/Y');
+                $partes[] = "- {$fecha}: {$c->estado} · Prob. lluvia: {$c->prob_lluvia}% · Precipitación: {$c->precipitacion_mm}mm";
+            }
+        } else {
+            $partes[] = "\nCLIMA: Sin datos disponibles.";
+        }
+
+        // --- Cotizaciones pendientes (todos) ---
+        $cotizaciones = Cotizacion::with(['obra', 'cliente'])
+            ->where('estado', 'pendiente')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        if ($cotizaciones->isNotEmpty()) {
+            $partes[] = "\nCOTIZACIONES PENDIENTES ({$cotizaciones->count()}):";
+            foreach ($cotizaciones as $c) {
+                $nombre = $c->obra?->titulo ?? $c->cliente_nombre ?? 'Sin nombre';
+                $partes[] = "- COT-{$c->id}: {$nombre} · Total: RD\$ " . number_format($c->total, 2, '.', ',');
+            }
+        }
+
+        // --- Cuadrillas (supervisor y dueño) ---
+        if (in_array($user->rol, ['dueno', 'supervisor'])) {
+            $cuadrillas = Cuadrilla::with(['obras' => fn ($q) => $q->where('estado', 'en_proceso')])
+                ->where('activa', true)
+                ->get();
+
+            if ($cuadrillas->isNotEmpty()) {
+                $partes[] = "\nCUADRILLAS ACTIVAS:";
+                foreach ($cuadrillas as $c) {
+                    $obraActual = $c->obras->first();
+                    $estado = $obraActual ? "trabajando en: {$obraActual->titulo}" : "disponible";
+                    $partes[] = "- {$c->nombre}: {$estado}";
+                }
+            }
+        }
+
+        // --- Finanzas del mes (dueño ÚNICAMENTE) ---
+        if ($user->rol === 'dueno') {
+            $inicioMes = now()->startOfMonth()->toDateString();
+            $finMes = now()->endOfMonth()->toDateString();
+
+            $ingresos = Factura::whereBetween('fecha_emision', [$inicioMes, $finMes])
+                ->where('anulada', false)
+                ->sum('total');
+
+            $gastos = Gasto::whereBetween('fecha', [$inicioMes, $finMes])
+                ->sum('monto');
+
+            $balance = $ingresos - $gastos;
+            $signo = $balance >= 0 ? '+' : '';
+
+            $partes[] = "\nFINANZAS DEL MES ACTUAL (CONFIDENCIAL — solo para el dueño):";
+            $partes[] = "- Ingresos por facturas: RD\$ " . number_format($ingresos, 2, '.', ',');
+            $partes[] = "- Gastos registrados: RD\$ " . number_format($gastos, 2, '.', ',');
+            $partes[] = "- Balance: {$signo}RD\$ " . number_format($balance, 2, '.', ',');
+        }
+
+        return implode("\n", $partes);
+    }
+
+    protected function promptSistema(?string $rol = null): string
+    {
+        $base = 'Eres Klika, el asistente de IA del ERP de Techos Estrella SRL, una empresa '
+            . 'dominicana de impermeabilización de techos en Santiago, RD. '
+            . 'Ayudas con cotizaciones, reprogramaciones por clima, inventario, estado de obras y preguntas del negocio. '
+            . 'Responde en español dominicano, claro y directo. No inventes datos — usa solo la información provista.';
+
+        return match ($rol) {
+            'dueno' => $base . ' Tienes acceso completo: obras, inventario, clima, cuadrillas y finanzas.',
+            'secretaria' => $base . ' Puedes consultar obras, inventario, cotizaciones y clima.',
+            'supervisor' => $base . ' Puedes consultar obras, cuadrillas, inventario y clima. No tienes acceso a datos financieros.',
+            'aplicador' => $base . ' Solo puedes consultar el estado de las obras en proceso y el clima.',
+            default => $base,
+        };
     }
 }

@@ -4,29 +4,43 @@
 // ============================================================
 const { useState: useStateK, useRef: useRefK, useEffect: useEffectK } = React;
 
-const SUGERENCIAS = [
-  "¿Qué obras debo mover por la lluvia?",
-  "Cotiza 120 m² de techo en condición regular",
-  "¿Qué materiales están bajo mínimo?",
-  "¿Cómo va la obra de Villa Olga?",
-];
-
-const RESPUESTAS = {
-  default: "Puedo ayudarte con cotizaciones, reprogramar obras por el clima, revisar inventario o consultar el estado de cualquier obra. ¿Qué necesitas?",
-  lluvia: "Revisé el clima de junio. El **jueves 11 y viernes 12 están bloqueados** por lluvia. Tienes *Familia Then Polanco* programada el jueves.\n\n👉 Te sugiero moverla al **lunes 15** (día apto) — la Cuadrilla A queda libre. ¿La reprogramo?",
-  cotiza: "Para 120 m² de techo en condición **regular** (factor 1.15), con 2 manos de membrana acrílica (rendimiento 9 m²/gal):\n\n• Membrana: (120 × 2 × 1.15) ÷ 9 = **30.7 cubetas**\n• Primer (1 mano): (120 × 1 × 1.15) ÷ 18 = **7.7 cubetas**\n\nMaterial ≈ RD$ 173,500 + mano de obra. ¿Genero la cotización formal?",
-  material: "Hay **3 materiales bajo mínimo**:\n\n• Cinta de refuerzo autoadhesiva — 3 / 12\n• Primer / sellador de poros — 9 / 15\n• Malla de refuerzo poliéster — 6 / 10\n\n¿Quieres que prepare una orden de compra?",
-  villa: "**Villa Olga · Familia Reyes** (OB-2401) va al **60%**. La Cuadrilla A está en sitio hoy. Terminó el primer y la 1ra mano de membrana; falta la 2da mano y el refuerzo en grietas. Fin estimado: **2 de junio**.",
+const SUGERENCIAS_POR_ROL = {
+  dueno: [
+    "¿Cómo van las finanzas del mes?",
+    "¿Qué obras debo mover por la lluvia?",
+    "¿Qué materiales están bajo mínimo?",
+    "Muéstrame el estado de todas las obras",
+  ],
+  secretaria: [
+    "¿Qué obras están en proceso ahora?",
+    "¿Qué cotizaciones están pendientes?",
+    "¿Qué materiales están bajo mínimo?",
+    "¿Cómo está el clima para esta semana?",
+  ],
+  supervisor: [
+    "¿Cómo están las cuadrillas hoy?",
+    "¿Qué obras debo mover por la lluvia?",
+    "¿Qué materiales están bajo mínimo?",
+    "Muéstrame el estado de todas las obras",
+  ],
+  aplicador: [
+    "¿Cuáles obras están en proceso?",
+    "¿Cómo está el clima esta semana?",
+  ],
+  default: [
+    "¿Qué obras están en proceso?",
+    "¿Qué materiales están bajo mínimo?",
+    "¿Cómo está el clima esta semana?",
+    "¿Qué cotizaciones están pendientes?",
+  ],
 };
 
-function matchResp(text) {
-  const t = text.toLowerCase();
-  if (t.includes("lluvia") || t.includes("clima") || t.includes("mov")) return RESPUESTAS.lluvia;
-  if (t.includes("cotiz") || t.includes("m²") || t.includes("m2") || t.includes("metro")) return RESPUESTAS.cotiza;
-  if (t.includes("material") || t.includes("mínimo") || t.includes("stock") || t.includes("inventario")) return RESPUESTAS.material;
-  if (t.includes("villa") || t.includes("olga") || t.includes("obra")) return RESPUESTAS.villa;
-  return RESPUESTAS.default;
+function getSugerencias() {
+  const rol = window.__klikaUser?.rol;
+  return SUGERENCIAS_POR_ROL[rol] ?? SUGERENCIAS_POR_ROL.default;
 }
+
+const RESPUESTA_OFFLINE = "Klika no está disponible en este momento. Verifica la conexión al servidor y vuelve a intentarlo.";
 
 function fmtMsg(s) {
   return s.split("\n").map((line, i) => (
@@ -53,20 +67,15 @@ function KlikaPanel({ onClose, onNav, mobile }) {
     setInput("");
     setTyping(true);
 
-    if (window.KlikaData && KlikaData.conectado()) {
-      try {
-        const res = await KlikaData.klika.chat(t, convId);
-        setTyping(false);
-        if (res.conversacion_id) setConvId(res.conversacion_id);
-        setMsgs((m) => [...m, { from: "klika", text: res.respuesta ?? matchResp(t) }]);
-        return;
-      } catch (_) {}
-    }
-
-    setTimeout(() => {
+    try {
+      const res = await KlikaData.klika.chat(t, convId);
       setTyping(false);
-      setMsgs((m) => [...m, { from: "klika", text: matchResp(t) }]);
-    }, 850);
+      if (res.conversacion_id) setConvId(res.conversacion_id);
+      setMsgs((m) => [...m, { from: "klika", text: res.respuesta || RESPUESTA_OFFLINE }]);
+    } catch (_) {
+      setTyping(false);
+      setMsgs((m) => [...m, { from: "klika", text: RESPUESTA_OFFLINE }]);
+    }
   }
 
   return (
@@ -103,7 +112,7 @@ function KlikaPanel({ onClose, onNav, mobile }) {
           )}
           {msgs.length <= 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
-              {SUGERENCIAS.map((s) => (
+              {getSugerencias().map((s) => (
                 <button key={s} onClick={() => send(s)} style={kp.suggest}>
                   <Icon name="sparkle" size={14} color="var(--blue-600)" /> {s}
                 </button>

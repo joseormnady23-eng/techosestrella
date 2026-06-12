@@ -31,7 +31,7 @@ class KlikaController extends Controller
 
         $conversacion->mensajes()->create(['rol' => 'user', 'contenido' => $data['mensaje']]);
 
-        $resultado = $this->klika->generar($data['mensaje']);
+        $resultado = $this->klika->generarConContexto($data['mensaje'], $request->user());
 
         $conversacion->mensajes()->create(['rol' => 'assistant', 'contenido' => $resultado['respuesta']]);
 
