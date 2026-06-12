@@ -43,10 +43,33 @@ function getSugerencias() {
 const RESPUESTA_OFFLINE = "Klika no está disponible en este momento. Verifica la conexión al servidor y vuelve a intentarlo.";
 
 function fmtMsg(s) {
-  return s.split("\n").map((line, i) => (
-    <div key={i} style={{ minHeight: line ? "auto" : 8 }}
-      dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>") }} />
-  ));
+  return s.split("\n").map((line, i) => {
+    let style = { minHeight: line ? "auto" : 6 };
+    let html = line;
+
+    const h3 = html.match(/^###\s+(.+)/);
+    const h2 = html.match(/^##\s+(.+)/);
+    const h1 = html.match(/^#\s+(.+)/);
+    if (h3) {
+      html = h3[1];
+      style = { fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--ink-400)", marginTop: 12, marginBottom: 2 };
+    } else if (h2) {
+      html = h2[1];
+      style = { fontWeight: 700, fontSize: 13.5, marginTop: 10, marginBottom: 2 };
+    } else if (h1) {
+      html = h1[1];
+      style = { fontWeight: 700, fontSize: 14, marginTop: 8, marginBottom: 2 };
+    }
+
+    const bullet = html.match(/^[-*]\s+(.+)/);
+    if (bullet) { html = "• " + bullet[1]; style = { ...style, paddingLeft: 2 }; }
+
+    html = html
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+    return <div key={i} style={style} dangerouslySetInnerHTML={{ __html: html }} />;
+  });
 }
 
 function KlikaPanel({ onClose, onNav, mobile }) {
