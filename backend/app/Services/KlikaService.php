@@ -108,8 +108,14 @@ class KlikaService
         if ($obras->isNotEmpty()) {
             $partes[] = "OBRAS EN PROCESO ({$obras->count()}):";
             foreach ($obras as $o) {
+                $inicio = $o->fecha_inicio_estimada ? $o->fecha_inicio_estimada->format('d/m/Y') : 'sin fecha';
                 $fin = $o->fecha_fin_estimada ? $o->fecha_fin_estimada->format('d/m/Y') : 'sin fecha';
-                $partes[] = "- {$o->codigo}: {$o->titulo} · Cliente: {$o->cliente?->nombre} · Cuadrilla: {$o->cuadrilla?->nombre} · Fin estimado: {$fin}";
+                $partes[] = "• {$o->codigo}: {$o->titulo}"
+                    . " · Cliente: {$o->cliente?->nombre}"
+                    . " · Cuadrilla: {$o->cuadrilla?->nombre}"
+                    . " · Inicio est.: {$inicio}"
+                    . " · Fin est.: {$fin}"
+                    . " · Dirección: {$o->direccion_obra}";
             }
         } else {
             $partes[] = "OBRAS EN PROCESO: Ninguna actualmente.";
@@ -201,9 +207,14 @@ class KlikaService
     {
         $base = 'Eres Klika, el asistente de IA del ERP de Techos Estrella SRL, una empresa '
             . 'dominicana de impermeabilización de techos en Santiago, RD. '
-            . 'Ayudas con cotizaciones, reprogramaciones por clima, inventario, estado de obras y preguntas del negocio. '
-            . 'Responde en español dominicano, claro y directo. No inventes datos — usa solo la información provista. '
-            . 'IMPORTANTE: No uses markdown. No uses #, ##, ###, **, *, >, ni guiones para listas. '
+            . 'En el bloque DATOS EN TIEMPO REAL que recibes tienes TODA la información actual del negocio: '
+            . 'obras activas, inventario, clima, cotizaciones y cuadrillas. '
+            . 'REGLA CRÍTICA: NUNCA le pidas al usuario datos que ya están en ese bloque. '
+            . 'Si el usuario pregunta por obras, clima o inventario, responde directamente con los datos que tienes. '
+            . 'Si hay varias obras y el usuario no especifica cuál, lista las opciones del contexto y pregunta cuál. '
+            . 'Puedes sugerir acciones (reagendar, pedir materiales, etc.) pero aclara que los cambios los hace el usuario en el ERP. '
+            . 'Responde en español dominicano, claro y directo. No inventes datos fuera del contexto provisto. '
+            . 'FORMATO: No uses markdown. No uses #, ##, ###, **, *, ni guiones para listas. '
             . 'Usa texto plano con saltos de línea para separar secciones. Para listas usa "• " al inicio de cada ítem.';
 
         return match ($rol) {
