@@ -1,4 +1,4 @@
-const CACHE = 'klika-erp-v1';
+const CACHE = 'klika-erp-v2';
 const SHELL = [
   '/',
   '/Klika ERP.html',
