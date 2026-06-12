@@ -38,8 +38,12 @@ class KlikaService
     public function generarConContexto(string $prompt, Usuario $user): array
     {
         $contexto = $this->buildContexto($user);
-        $sistema = $this->promptSistema($user->rol) . "\n\n--- DATOS EN TIEMPO REAL ---\n" . $contexto;
-        return $this->generar($prompt, $sistema);
+
+        // El contexto va en el prompt del usuario, no solo en el system prompt.
+        // Los modelos prestan mucho más atención a los datos en el turno de usuario.
+        $promptConContexto = "INFORMACIÓN ACTUAL DEL NEGOCIO (úsala para responder):\n{$contexto}\n\nPREGUNTA: {$prompt}";
+
+        return $this->generar($promptConContexto, $this->promptSistema($user->rol));
     }
 
     /**
