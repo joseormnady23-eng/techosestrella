@@ -130,7 +130,7 @@ function App() {
 
   const actions = (role === "dueno" || role === "supervisor") ? (
     <button onClick={() => setMapaOpen(true)} className="btn btn-icon btn-soft" title="Mapa de flota">
-      <Icon name="map-pin" size={19} />
+      <Icon name="location" size={19} />
     </button>
   ) : null;
 

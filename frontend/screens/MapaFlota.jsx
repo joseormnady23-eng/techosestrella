@@ -110,7 +110,7 @@ function MapaFlota({ onClose }) {
       {/* Header */}
       <div style={mf.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Icon name="map-pin" size={20} color="var(--blue-600)" />
+          <Icon name="location" size={20} color="var(--blue-600)" />
           <span style={{ fontWeight: 700, fontSize: 16 }}>Mapa de flota</span>
           {!cargando && (
             <span style={mf.badge}>{ubicaciones.length} en ruta</span>
@@ -132,7 +132,7 @@ function MapaFlota({ onClose }) {
         )}
         {!cargando && ubicaciones.length === 0 && !error && (
           <div style={mf.overlay}>
-            <Icon name="map-pin" size={32} color="var(--ink-300)" />
+            <Icon name="location" size={32} color="var(--ink-300)" />
             <span style={{ fontSize: 14, color: "var(--ink-400)", marginTop: 8 }}>Ningún conductor activo en este momento</span>
           </div>
         )}
